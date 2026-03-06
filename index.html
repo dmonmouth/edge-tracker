@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>EDGE — Kalshi Tracker</title>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
+
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; background: #080b12; color: #e2e8f0; font-family: 'DM Mono', 'Courier New', monospace; font-size: 14px; }
@@ -45,8 +45,6 @@ nav { display: flex; gap: 4px; }
 .btn-exit:hover { background: #f59e0b35; }
 .btn-danger { background: transparent; color: #ef4444; border: 1px solid #ef444440; cursor: pointer; border-radius: 6px; padding: 5px 10px; font-size: 11px; font-family: inherit; }
 .btn-danger:hover { background: #ef444415; }
-.btn-google { background: #fff; color: #1a1a1a; display: flex; align-items: center; gap: 10px; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; border: none; cursor: pointer; }
-.btn-google:hover { background: #f0f0f0; }
 
 .card { background: #0f1117; border: 1px solid #1e2230; border-radius: 12px; padding: 20px; }
 .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
@@ -92,12 +90,6 @@ select.input-field option { background: #0f1117; }
 .page { display: none; }
 .page.active { display: block; }
 .flex-between { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
-
-/* Sign in screen */
-.signin-screen { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 60px); }
-.signin-card { background: #0f1117; border: 1px solid #1e2230; border-radius: 16px; padding: 48px; text-align: center; max-width: 400px; width: 100%; }
-.signin-title { font-family: Georgia, serif; font-weight: 700; font-size: 22px; margin-bottom: 8px; }
-.signin-sub { color: #4a5568; font-size: 13px; margin-bottom: 32px; line-height: 1.6; }
 
 /* Calendar */
 .cal-picker-wrap { position: relative; }
@@ -145,13 +137,12 @@ select.input-field option { background: #0f1117; }
         <button class="nav-btn" onclick="showPage('calibration')">calibration</button>
         <button class="nav-btn" id="add-nav-btn" onclick="showPage('add')">+ add</button>
         <button class="nav-btn" onclick="showPage('calc')">⊕ calc</button>
-        <button class="nav-btn" id="signout-btn" style="display:none;color:#ef444480" onclick="signOut()">sign out</button>
       </nav>
     </div>
   </div>
 </div>
 
-<div class="main" id="main-content" style="display:none">
+<div class="main" id="main-content">
 
   <!-- DASHBOARD -->
   <div class="page active" id="page-dashboard">
@@ -379,16 +370,6 @@ select.input-field option { background: #0f1117; }
 
 </div>
 
-<!-- Sign In Screen -->
-<div id="signin-screen" class="signin-screen">
-  <div class="signin-card">
-    <div style="font-size:40px;margin-bottom:16px">📈</div>
-    <div class="signin-title">EDGE Tracker</div>
-    <div class="signin-sub">Sign in with Google to sync your trades across all your devices via Google Sheets.</div>
-    <div id="g-signin-btn"></div>
-  </div>
-</div>
-
 <!-- Early Exit Modal -->
 <div class="modal-overlay" id="exit-modal">
   <div class="modal">
@@ -416,12 +397,8 @@ select.input-field option { background: #0f1117; }
 
 <script>
 // ── Config ────────────────────────────────────────────────
-var CLIENT_ID = '854799078386-b5lcg713mjr5583hn262pdvv24oci14u.apps.googleusercontent.com';
-var API_KEY = 'AIzaSyBAnXWkAk4YN0sgEaZi41koc9cwcrlCzcw';
-var SHEET_ID = '1c7cNvL1gSZ90akG1x8l_OuYuu6RV_fbRGGRW8k5ZIqc';
-var SHEET_NAME = 'Trades';
-var SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
-var DISCOVERY_DOC = 'https://sheets.googleapis.com/$discovery/rest?version=v4';
+var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw6fWWLic8wCW8q03N6ozEm04NBlB-JczjVzQtZGEGrOOgpNiRcKliStPHW2VZOrS2S/exec';
+var HEADERS = ['id','market','category','platform','probability','direction','stake','status','exit_price','exit_pnl','actual_pnl','date','notes'];
 
 // ── State ─────────────────────────────────────────────────
 var trades = [];
@@ -429,8 +406,6 @@ var editId = null;
 var currentFilter = 'All';
 var sortOrder = 'desc';
 var exitTargetId = null;
-var accessToken = null;
-var gapiReady = false;
 
 // ── Toast ─────────────────────────────────────────────────
 function showToast(msg, color) {
@@ -449,100 +424,18 @@ function setSyncStatus(state, msg) {
   status.textContent = msg || '';
 }
 
-// ── Google Auth ───────────────────────────────────────────
-function initGoogleAuth() {
-  google.accounts.oauth2.initTokenClient({
-    client_id: CLIENT_ID,
-    scope: SCOPES,
-    callback: function(resp) {
-      if (resp.error) { setSyncStatus('error', 'Auth failed'); return; }
-      accessToken = resp.access_token;
-      onSignedIn();
-    }
-  });
-
-  // Render sign-in button
-  google.accounts.id.initialize({
-    client_id: CLIENT_ID,
-    callback: function(resp) {
-      // Use token client for actual API access
-      requestToken();
-    }
-  });
-  google.accounts.id.renderButton(document.getElementById('g-signin-btn'), {
-    theme: 'outline', size: 'large', text: 'signin_with', shape: 'rectangular'
-  });
-  google.accounts.id.prompt();
-}
-
-var tokenClient;
-function setupTokenClient() {
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: CLIENT_ID,
-    scope: SCOPES,
-    callback: function(resp) {
-      if (resp.error) { setSyncStatus('error', 'Auth failed'); return; }
-      accessToken = resp.access_token;
-      onSignedIn();
-    }
-  });
-}
-
-function requestToken() {
-  if (!tokenClient) setupTokenClient();
-  tokenClient.requestAccessToken({ prompt: '' });
-}
-
-function signIn() { requestToken(); }
-
-function signOut() {
-  if (accessToken) google.accounts.oauth2.revoke(accessToken, function(){});
-  accessToken = null;
-  document.getElementById('signin-screen').style.display = 'flex';
-  document.getElementById('main-content').style.display = 'none';
-  document.getElementById('signout-btn').style.display = 'none';
-  setSyncStatus('', '');
-}
-
-function onSignedIn() {
-  document.getElementById('signin-screen').style.display = 'none';
-  document.getElementById('main-content').style.display = 'block';
-  document.getElementById('signout-btn').style.display = '';
-  calInit(new Date().toISOString().slice(0,10));
-  loadFromSheet();
-}
-
-// ── Google Sheets API ─────────────────────────────────────
-var HEADERS = ['id','market','category','platform','probability','direction','stake','status','exit_price','exit_pnl','actual_pnl','date','notes'];
-
-function sheetsRequest(method, path, body) {
-  return fetch('https://sheets.googleapis.com/v4/spreadsheets/' + SHEET_ID + path, {
-    method: method,
-    headers: {
-      'Authorization': 'Bearer ' + accessToken,
-      'Content-Type': 'application/json'
-    },
-    body: body ? JSON.stringify(body) : undefined
-  }).then(function(r) { return r.json(); });
-}
-
+// ── Sync ──────────────────────────────────────────────────
 function loadFromSheet() {
   setSyncStatus('syncing', 'Loading...');
-  sheetsRequest('GET', '/values/' + SHEET_NAME + '!A1:M')
+  fetch(SCRIPT_URL)
+    .then(function(r){ return r.json(); })
     .then(function(data) {
-      if (data.error && data.error.status === 'NOT_FOUND') {
-        // Sheet tab doesn't exist yet, create it with headers
-        return createSheetTab().then(function(){ trades = []; renderAll(); setSyncStatus('', 'Synced'); });
-      }
       var rows = data.values || [];
-      if (rows.length === 0) {
-        // Empty sheet, write headers
-        return writeHeaders().then(function(){ trades = []; renderAll(); setSyncStatus('', 'Synced'); });
-      }
+      if (rows.length <= 1) { trades = []; renderAll(); setSyncStatus('', 'Synced'); return; }
       var headers = rows[0];
       trades = rows.slice(1).filter(function(r){ return r[0]; }).map(function(r) {
         var t = {};
-        headers.forEach(function(h, i){ t[h] = r[i] || ''; });
+        headers.forEach(function(h, i){ t[h] = r[i] !== undefined ? r[i] : ''; });
         t.probability = Number(t.probability) || 0;
         t.stake = Number(t.stake) || 0;
         t.id = Number(t.id) || Date.now();
@@ -557,36 +450,23 @@ function loadFromSheet() {
     .catch(function(e){ setSyncStatus('error', 'Load failed'); console.error(e); });
 }
 
-function createSheetTab() {
-  return fetch('https://sheets.googleapis.com/v4/spreadsheets/' + SHEET_ID + ':batchUpdate', {
-    method: 'POST',
-    headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ requests: [{ addSheet: { properties: { title: SHEET_NAME } } }] })
-  }).then(function(r){ return r.json(); }).then(function(){ return writeHeaders(); });
-}
-
-function writeHeaders() {
-  return sheetsRequest('PUT', '/values/' + SHEET_NAME + '!A1?valueInputOption=RAW', {
-    values: [HEADERS]
-  });
-}
-
 function tradeToRow(t) {
-  return HEADERS.map(function(h){
-    var v = t[h];
-    return v == null ? '' : v;
-  });
+  return HEADERS.map(function(h){ var v = t[h]; return v == null ? '' : String(v); });
 }
 
 function saveAllToSheet() {
   setSyncStatus('syncing', 'Saving...');
   var values = [HEADERS].concat(trades.map(tradeToRow));
-  sheetsRequest('PUT', '/values/' + SHEET_NAME + '!A1?valueInputOption=RAW', { values: values })
-    .then(function(r){
-      if (r.error) { setSyncStatus('error', 'Save failed'); showToast('Save failed: ' + r.error.message, 'red'); return; }
-      setSyncStatus('', 'Synced · ' + trades.length + ' trades');
-    })
-    .catch(function(){ setSyncStatus('error', 'Save failed'); });
+  fetch(SCRIPT_URL, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'write', values: values })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    if (data.success) setSyncStatus('', 'Synced · ' + trades.length + ' trades');
+    else { setSyncStatus('error', 'Save failed'); showToast('Save failed', 'red'); }
+  })
+  .catch(function(){ setSyncStatus('error', 'Save failed'); });
 }
 
 // ── Nav ───────────────────────────────────────────────────
@@ -1156,9 +1036,9 @@ function calcUpdate() {
 
 // ── Init ──────────────────────────────────────────────────
 window.onload = function() {
-  setupTokenClient();
-  tokenClient.requestAccessToken({ prompt: '' });
+  calInit(new Date().toISOString().slice(0,10));
   initCalc();
+  loadFromSheet();
 };
 </script>
 </body>
