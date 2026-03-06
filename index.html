@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>EDGE — Kalshi Tracker</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; background: #080b12; color: #e2e8f0; font-family: 'DM Mono', 'Courier New', monospace; font-size: 14px; }
@@ -14,10 +15,14 @@ html, body { height: 100%; background: #080b12; color: #e2e8f0; font-family: 'DM
 .header { border-bottom: 1px solid #1e2230; padding: 0 32px; position: sticky; top: 0; background: #080b12; z-index: 100; }
 .header-inner { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; height: 60px; }
 .logo { display: flex; align-items: center; gap: 12px; }
-.logo-dot { width: 8px; height: 8px; background: #10b981; border-radius: 50%; box-shadow: 0 0 8px #10b981; }
+.logo-dot { width: 8px; height: 8px; background: #10b981; border-radius: 50%; box-shadow: 0 0 8px #10b981; transition: background 0.3s; }
+.logo-dot.syncing { background: #f59e0b; box-shadow: 0 0 8px #f59e0b; animation: pulse 1s infinite; }
+.logo-dot.error { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 .logo-title { font-weight: 800; font-size: 18px; letter-spacing: -0.02em; font-family: Georgia, serif; }
 .logo-sub { color: #4a5568; font-size: 12px; letter-spacing: 0.08em; }
 .logo-sep { color: #2a2d3a; }
+.sync-status { font-size: 11px; color: #4a5568; }
 
 nav { display: flex; gap: 4px; }
 .nav-btn { background: none; border: none; cursor: pointer; padding: 8px 16px; border-radius: 6px; font-family: inherit; font-size: 13px; letter-spacing: 0.04em; transition: all 0.15s; color: #4a5568; }
@@ -40,6 +45,8 @@ nav { display: flex; gap: 4px; }
 .btn-exit:hover { background: #f59e0b35; }
 .btn-danger { background: transparent; color: #ef4444; border: 1px solid #ef444440; cursor: pointer; border-radius: 6px; padding: 5px 10px; font-size: 11px; font-family: inherit; }
 .btn-danger:hover { background: #ef444415; }
+.btn-google { background: #fff; color: #1a1a1a; display: flex; align-items: center; gap: 10px; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; border: none; cursor: pointer; }
+.btn-google:hover { background: #f0f0f0; }
 
 .card { background: #0f1117; border: 1px solid #1e2230; border-radius: 12px; padding: 20px; }
 .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
@@ -86,7 +93,13 @@ select.input-field option { background: #0f1117; }
 .page.active { display: block; }
 .flex-between { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
 
-/* Custom calendar */
+/* Sign in screen */
+.signin-screen { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 60px); }
+.signin-card { background: #0f1117; border: 1px solid #1e2230; border-radius: 16px; padding: 48px; text-align: center; max-width: 400px; width: 100%; }
+.signin-title { font-family: Georgia, serif; font-weight: 700; font-size: 22px; margin-bottom: 8px; }
+.signin-sub { color: #4a5568; font-size: 13px; margin-bottom: 32px; line-height: 1.6; }
+
+/* Calendar */
 .cal-picker-wrap { position: relative; }
 .cal-trigger { background: #080b12; border: 1px solid #2a2d3a; color: #e2e8f0; padding: 9px 12px; border-radius: 7px; font-family: inherit; font-size: 13px; width: 100%; text-align: left; cursor: pointer; transition: border 0.15s; display: flex; justify-content: space-between; align-items: center; }
 .cal-trigger:focus, .cal-trigger.open { border-color: #10b981; outline: none; }
@@ -105,9 +118,8 @@ select.input-field option { background: #0f1117; }
 .cal-date.today { color: #6366f1; font-weight: 700; }
 .cal-date.selected { background: #10b981; color: #080b12; font-weight: 700; }
 .cal-date.other-month { color: #2a2d3a; }
-.cal-date:disabled { opacity: 0; pointer-events: none; }
 
-/* Early exit modal */
+/* Modal */
 .modal-overlay { display: none; position: fixed; inset: 0; background: #000000aa; z-index: 200; align-items: center; justify-content: center; }
 .modal-overlay.show { display: flex; }
 .modal { background: #0f1117; border: 1px solid #2a2d3a; border-radius: 14px; padding: 28px; width: 360px; max-width: 90vw; }
@@ -120,21 +132,26 @@ select.input-field option { background: #0f1117; }
 <div class="header">
   <div class="header-inner">
     <div class="logo">
-      <div class="logo-dot"></div>
+      <div class="logo-dot" id="sync-dot"></div>
       <span class="logo-title">EDGE</span>
       <span class="logo-sep">/</span>
       <span class="logo-sub">KALSHI TRACKER</span>
     </div>
-    <nav>
-      <button class="nav-btn active" onclick="showPage('dashboard')">dashboard</button>
-      <button class="nav-btn" onclick="showPage('trades')">trades</button>
-      <button class="nav-btn" onclick="showPage('calibration')">calibration</button>
-      <button class="nav-btn" id="add-nav-btn" onclick="showPage('add')">+ add</button>
-    </nav>
+    <div style="display:flex;align-items:center;gap:16px">
+      <span class="sync-status" id="sync-status"></span>
+      <nav>
+        <button class="nav-btn active" onclick="showPage('dashboard')">dashboard</button>
+        <button class="nav-btn" onclick="showPage('trades')">trades</button>
+        <button class="nav-btn" onclick="showPage('calibration')">calibration</button>
+        <button class="nav-btn" id="add-nav-btn" onclick="showPage('add')">+ add</button>
+        <button class="nav-btn" onclick="showPage('calc')">⊕ calc</button>
+        <button class="nav-btn" id="signout-btn" style="display:none;color:#ef444480" onclick="signOut()">sign out</button>
+      </nav>
+    </div>
   </div>
 </div>
 
-<div class="main">
+<div class="main" id="main-content" style="display:none">
 
   <!-- DASHBOARD -->
   <div class="page active" id="page-dashboard">
@@ -270,10 +287,8 @@ select.input-field option { background: #0f1117; }
           <option value="exit">Closed Early</option>
         </select>
       </div>
-
-      <!-- Early exit fields -->
       <div id="exit-fields" style="display:none">
-        <div class="exit-banner">Early exit — this trade will count toward P&amp;L but be excluded from calibration since there's no final outcome to measure against.</div>
+        <div class="exit-banner">Early exit — counts toward P&amp;L but excluded from calibration.</div>
         <div class="form-row2" style="margin-top:16px">
           <div>
             <label class="form-label">EXIT PRICE %</label>
@@ -282,18 +297,15 @@ select.input-field option { background: #0f1117; }
           <div>
             <label class="form-label">ACTUAL P&amp;L ($)</label>
             <input class="input-field" id="f-exit-pnl" type="number" placeholder="12.50" step="0.01" />
-            <div style="color:#4a5568;font-size:11px;margin-top:4px">Use negative for a loss, e.g. -8.00</div>
+            <div style="color:#4a5568;font-size:11px;margin-top:4px">Negative for a loss</div>
           </div>
         </div>
       </div>
-
-      <!-- Resolved actual P&L -->
       <div id="resolved-pnl-field" style="display:none">
         <label class="form-label">ACTUAL P&amp;L ($) <span style="color:#4a5568;font-weight:normal;letter-spacing:0">— optional, from Robinhood</span></label>
         <input class="input-field" id="f-actual-pnl" type="number" placeholder="e.g. 15.25 or -9.44" step="0.01" />
-        <div style="color:#4a5568;font-size:11px;margin-top:4px">If left blank, P&amp;L will be estimated from implied odds</div>
+        <div style="color:#4a5568;font-size:11px;margin-top:4px">If blank, P&amp;L estimated from implied odds</div>
       </div>
-
       <div>
         <label class="form-label">NOTES (optional)</label>
         <input class="input-field" id="f-notes" placeholder="Reasoning, source, context..." />
@@ -306,8 +318,7 @@ select.input-field option { background: #0f1117; }
     <div class="card" style="max-width:600px">
       <div style="font-family:Georgia,serif;font-weight:700;font-size:15px;margin-bottom:4px">Import CSV</div>
       <div style="color:#4a5568;font-size:12px;margin-bottom:16px;line-height:1.7">
-        Columns: <code style="color:#10b981;font-size:11px">market, category, platform, probability, direction, stake, status, exit_price, exit_pnl, actual_pnl, date, notes</code><br/>
-        <span style="color:#4a5568">status = open | yes | no | exit</span>
+        Columns: <code style="color:#10b981;font-size:11px">market, category, platform, probability, direction, stake, status, exit_price, exit_pnl, actual_pnl, date, notes</code>
       </div>
       <div style="display:flex;gap:10px">
         <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="importCSV(event)" />
@@ -317,6 +328,65 @@ select.input-field option { background: #0f1117; }
     </div>
   </div>
 
+  <!-- CALCULATOR -->
+  <div class="page" id="page-calc">
+    <div style="margin-bottom:28px;max-width:680px">
+      <div class="section-title">P&amp;L Calculator</div>
+      <div class="section-sub">Split a combined payout across multiple lots when you double down</div>
+    </div>
+
+    <div class="card" style="max-width:680px;margin-bottom:20px">
+      <div style="font-family:Georgia,serif;font-weight:700;font-size:15px;margin-bottom:4px">How did the position close?</div>
+      <div style="display:flex;gap:10px;margin-top:12px;margin-bottom:20px">
+        <button class="btn" id="calc-mode-resolved" style="background:#10b98120;color:#10b981;border:1px solid #10b98140" onclick="setCalcMode('resolved')">Resolved YES/NO</button>
+        <button class="btn btn-ghost" id="calc-mode-exit" onclick="setCalcMode('exit')">Closed Early</button>
+      </div>
+
+      <!-- Resolved fields -->
+      <div id="calc-resolved-fields">
+        <div style="color:#4a5568;font-size:12px;margin-bottom:16px">Each contract pays $1.00 at resolution. Enter how many contracts per lot and what you paid.</div>
+      </div>
+
+      <!-- Early exit fields -->
+      <div id="calc-exit-fields" style="display:none">
+        <div style="color:#4a5568;font-size:12px;margin-bottom:16px">Enter your total proceeds from Robinhood and we'll split it proportionally across your lots.</div>
+        <div style="max-width:280px">
+          <label class="form-label">TOTAL PROCEEDS ($)</label>
+          <input class="input-field" id="calc-proceeds" type="number" placeholder="e.g. 14.50" step="0.01" oninput="calcUpdate()" />
+        </div>
+      </div>
+
+      <!-- Lots -->
+      <div style="margin-top:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="font-family:Georgia,serif;font-weight:700;font-size:14px">Lots</div>
+          <button class="btn btn-ghost btn-sm" onclick="addCalcLot()">+ Add Lot</button>
+        </div>
+        <div id="calc-lots"></div>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div class="card" style="max-width:680px" id="calc-results" style="display:none">
+      <div style="font-family:Georgia,serif;font-weight:700;font-size:15px;margin-bottom:16px">Results</div>
+      <div id="calc-results-body"></div>
+      <div style="margin-top:16px;padding-top:16px;border-top:1px solid #1e2230;display:flex;justify-content:space-between;align-items:baseline">
+        <span style="color:#4a5568;font-size:12px;letter-spacing:0.08em">TOTAL P&amp;L</span>
+        <span id="calc-total-pnl" style="font-family:Georgia,serif;font-weight:700;font-size:22px"></span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Sign In Screen -->
+<div id="signin-screen" class="signin-screen">
+  <div class="signin-card">
+    <div style="font-size:40px;margin-bottom:16px">📈</div>
+    <div class="signin-title">EDGE Tracker</div>
+    <div class="signin-sub">Sign in with Google to sync your trades across all your devices via Google Sheets.</div>
+    <div id="g-signin-btn"></div>
+  </div>
 </div>
 
 <!-- Early Exit Modal -->
@@ -345,26 +415,181 @@ select.input-field option { background: #0f1117; }
 <div class="toast" id="toast"></div>
 
 <script>
-var STORAGE_KEY = 'edge_trades_v3';
+// ── Config ────────────────────────────────────────────────
+var CLIENT_ID = '854799078386-b5lcg713mjr5583hn262pdvv24oci14u.apps.googleusercontent.com';
+var API_KEY = 'AIzaSyBAnXWkAk4YN0sgEaZi41koc9cwcrlCzcw';
+var SHEET_ID = '1c7cNvL1gSZ90akG1x8l_OuYuu6RV_fbRGGRW8k5ZIqc';
+var SHEET_NAME = 'Trades';
+var SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
+var DISCOVERY_DOC = 'https://sheets.googleapis.com/$discovery/rest?version=v4';
+
+// ── State ─────────────────────────────────────────────────
 var trades = [];
 var editId = null;
 var currentFilter = 'All';
-var sortOrder = 'desc'; // desc = newest first, asc = oldest first
+var sortOrder = 'desc';
 var exitTargetId = null;
+var accessToken = null;
+var gapiReady = false;
 
-function load() {
-  try { var s = localStorage.getItem(STORAGE_KEY); trades = s ? JSON.parse(s) : []; } catch(e) { trades = []; }
-}
-function save() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(trades)); } catch(e) {}
-}
-function showToast(msg) {
+// ── Toast ─────────────────────────────────────────────────
+function showToast(msg, color) {
   var el = document.getElementById('toast');
-  el.textContent = '✓ ' + msg;
+  el.textContent = (color ? '' : '✓ ') + msg;
+  el.style.borderColor = color === 'red' ? '#ef444460' : '#2a2d3a';
   el.classList.add('show');
-  setTimeout(function(){ el.classList.remove('show'); }, 2500);
+  setTimeout(function(){ el.classList.remove('show'); }, 3000);
 }
 
+// ── Sync status ───────────────────────────────────────────
+function setSyncStatus(state, msg) {
+  var dot = document.getElementById('sync-dot');
+  var status = document.getElementById('sync-status');
+  dot.className = 'logo-dot' + (state === 'syncing' ? ' syncing' : state === 'error' ? ' error' : '');
+  status.textContent = msg || '';
+}
+
+// ── Google Auth ───────────────────────────────────────────
+function initGoogleAuth() {
+  google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPES,
+    callback: function(resp) {
+      if (resp.error) { setSyncStatus('error', 'Auth failed'); return; }
+      accessToken = resp.access_token;
+      onSignedIn();
+    }
+  });
+
+  // Render sign-in button
+  google.accounts.id.initialize({
+    client_id: CLIENT_ID,
+    callback: function(resp) {
+      // Use token client for actual API access
+      requestToken();
+    }
+  });
+  google.accounts.id.renderButton(document.getElementById('g-signin-btn'), {
+    theme: 'outline', size: 'large', text: 'signin_with', shape: 'rectangular'
+  });
+  google.accounts.id.prompt();
+}
+
+var tokenClient;
+function setupTokenClient() {
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPES,
+    callback: function(resp) {
+      if (resp.error) { setSyncStatus('error', 'Auth failed'); return; }
+      accessToken = resp.access_token;
+      onSignedIn();
+    }
+  });
+}
+
+function requestToken() {
+  if (!tokenClient) setupTokenClient();
+  tokenClient.requestAccessToken({ prompt: '' });
+}
+
+function signIn() { requestToken(); }
+
+function signOut() {
+  if (accessToken) google.accounts.oauth2.revoke(accessToken, function(){});
+  accessToken = null;
+  document.getElementById('signin-screen').style.display = 'flex';
+  document.getElementById('main-content').style.display = 'none';
+  document.getElementById('signout-btn').style.display = 'none';
+  setSyncStatus('', '');
+}
+
+function onSignedIn() {
+  document.getElementById('signin-screen').style.display = 'none';
+  document.getElementById('main-content').style.display = 'block';
+  document.getElementById('signout-btn').style.display = '';
+  calInit(new Date().toISOString().slice(0,10));
+  loadFromSheet();
+}
+
+// ── Google Sheets API ─────────────────────────────────────
+var HEADERS = ['id','market','category','platform','probability','direction','stake','status','exit_price','exit_pnl','actual_pnl','date','notes'];
+
+function sheetsRequest(method, path, body) {
+  return fetch('https://sheets.googleapis.com/v4/spreadsheets/' + SHEET_ID + path, {
+    method: method,
+    headers: {
+      'Authorization': 'Bearer ' + accessToken,
+      'Content-Type': 'application/json'
+    },
+    body: body ? JSON.stringify(body) : undefined
+  }).then(function(r) { return r.json(); });
+}
+
+function loadFromSheet() {
+  setSyncStatus('syncing', 'Loading...');
+  sheetsRequest('GET', '/values/' + SHEET_NAME + '!A1:M')
+    .then(function(data) {
+      if (data.error && data.error.status === 'NOT_FOUND') {
+        // Sheet tab doesn't exist yet, create it with headers
+        return createSheetTab().then(function(){ trades = []; renderAll(); setSyncStatus('', 'Synced'); });
+      }
+      var rows = data.values || [];
+      if (rows.length === 0) {
+        // Empty sheet, write headers
+        return writeHeaders().then(function(){ trades = []; renderAll(); setSyncStatus('', 'Synced'); });
+      }
+      var headers = rows[0];
+      trades = rows.slice(1).filter(function(r){ return r[0]; }).map(function(r) {
+        var t = {};
+        headers.forEach(function(h, i){ t[h] = r[i] || ''; });
+        t.probability = Number(t.probability) || 0;
+        t.stake = Number(t.stake) || 0;
+        t.id = Number(t.id) || Date.now();
+        t.exit_price = t.exit_price !== '' ? Number(t.exit_price) : null;
+        t.exit_pnl = t.exit_pnl !== '' ? Number(t.exit_pnl) : null;
+        t.actual_pnl = t.actual_pnl !== '' ? Number(t.actual_pnl) : null;
+        return t;
+      });
+      renderAll();
+      setSyncStatus('', 'Synced · ' + trades.length + ' trades');
+    })
+    .catch(function(e){ setSyncStatus('error', 'Load failed'); console.error(e); });
+}
+
+function createSheetTab() {
+  return fetch('https://sheets.googleapis.com/v4/spreadsheets/' + SHEET_ID + ':batchUpdate', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ requests: [{ addSheet: { properties: { title: SHEET_NAME } } }] })
+  }).then(function(r){ return r.json(); }).then(function(){ return writeHeaders(); });
+}
+
+function writeHeaders() {
+  return sheetsRequest('PUT', '/values/' + SHEET_NAME + '!A1?valueInputOption=RAW', {
+    values: [HEADERS]
+  });
+}
+
+function tradeToRow(t) {
+  return HEADERS.map(function(h){
+    var v = t[h];
+    return v == null ? '' : v;
+  });
+}
+
+function saveAllToSheet() {
+  setSyncStatus('syncing', 'Saving...');
+  var values = [HEADERS].concat(trades.map(tradeToRow));
+  sheetsRequest('PUT', '/values/' + SHEET_NAME + '!A1?valueInputOption=RAW', { values: values })
+    .then(function(r){
+      if (r.error) { setSyncStatus('error', 'Save failed'); showToast('Save failed: ' + r.error.message, 'red'); return; }
+      setSyncStatus('', 'Synced · ' + trades.length + ' trades');
+    })
+    .catch(function(){ setSyncStatus('error', 'Save failed'); });
+}
+
+// ── Nav ───────────────────────────────────────────────────
 function showPage(name) {
   document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
   document.querySelectorAll('.nav-btn').forEach(function(b){ b.classList.remove('active'); });
@@ -379,9 +604,20 @@ function showPage(name) {
   if (name==='dashboard') renderDashboard();
   if (name==='trades') renderTrades();
   if (name==='calibration') renderCalibration();
+  if (name==='calc') { initCalc(); }
   if (name!=='add') cancelEdit();
 }
 
+function renderAll() {
+  var active = document.querySelector('.page.active');
+  var name = active ? active.id.replace('page-','') : 'dashboard';
+  if (name==='dashboard') renderDashboard();
+  if (name==='trades') renderTrades();
+  if (name==='calibration') renderCalibration();
+  else renderDashboard();
+}
+
+// ── Buckets ───────────────────────────────────────────────
 var BUCKETS = [
   {label:'0–10%',min:0,max:10},{label:'10–20%',min:10,max:20},
   {label:'20–30%',min:20,max:30},{label:'30–40%',min:30,max:40},
@@ -390,61 +626,53 @@ var BUCKETS = [
   {label:'80–90%',min:80,max:90},{label:'90–100%',min:90,max:101}
 ];
 
-// Status helpers
-function isOpen(t) { return t.status === 'open' || (!t.status && !t.resolved); }
-function isExit(t) { return t.status === 'exit'; }
-function isResolved(t) { return t.status === 'yes' || t.status === 'no' || (t.status === undefined && t.resolved); }
-function getOutcome(t) { 
-  if (t.status === 'yes') return 'YES';
-  if (t.status === 'no') return 'NO';
+// ── Helpers ───────────────────────────────────────────────
+function isOpen(t) { return t.status==='open' || (!t.status && !t.resolved); }
+function isExit(t) { return t.status==='exit'; }
+function isResolved(t) { return t.status==='yes'||t.status==='no'||(t.status===undefined&&t.resolved); }
+function getOutcome(t) {
+  if (t.status==='yes') return 'YES';
+  if (t.status==='no') return 'NO';
   if (t.outcome) return t.outcome;
   return null;
 }
-function isWin(t) { return isResolved(t) && t.direction === getOutcome(t); }
+function isWin(t) { return isResolved(t) && t.direction===getOutcome(t); }
 
 function getStats() {
   var resolved = trades.filter(isResolved);
   var exits = trades.filter(isExit);
   var wins = resolved.filter(isWin).length;
   var totalStake = resolved.reduce(function(a,t){ return a+Number(t.stake); }, 0);
-
-  // P&L: use actual_pnl if provided, otherwise fall back to implied odds estimate
   var resolvedPnl = resolved.reduce(function(acc,t){
-    if (t.actual_pnl != null) return acc + Number(t.actual_pnl);
+    if (t.actual_pnl!=null && t.actual_pnl!=='') return acc+Number(t.actual_pnl);
     var p=t.probability/100, s=Number(t.stake);
-    return isWin(t) ? acc+s*(1/p-1) : acc-s;
+    return isWin(t)?acc+s*(1/p-1):acc-s;
   }, 0);
-  var exitPnl = exits.reduce(function(acc,t){
-    return acc + (t.exit_pnl ? Number(t.exit_pnl) : 0);
-  }, 0);
-  var totalPnl = resolvedPnl + exitPnl;
-
+  var exitPnl = exits.reduce(function(acc,t){ return acc+(t.exit_pnl?Number(t.exit_pnl):0); }, 0);
+  var totalPnl = resolvedPnl+exitPnl;
   return {
     wins:wins, total:resolved.length,
-    winRate: resolved.length ? (wins/resolved.length*100).toFixed(1) : 0,
-    pnl: totalPnl.toFixed(2),
-    resolvedPnl: resolvedPnl.toFixed(2),
-    exitPnl: exitPnl.toFixed(2),
-    totalStake:totalStake,
-    exitCount: exits.length,
-    exitNet: exitPnl.toFixed(2)
+    winRate: resolved.length?(wins/resolved.length*100).toFixed(1):0,
+    pnl: totalPnl.toFixed(2), resolvedPnl:resolvedPnl.toFixed(2),
+    exitPnl:exitPnl.toFixed(2), totalStake:totalStake,
+    exitCount:exits.length, exitNet:exitPnl.toFixed(2)
   };
 }
 
 function getCalibration() {
-  // Only held-to-resolution trades
   var resolved = trades.filter(isResolved);
   return BUCKETS.map(function(b){
     var inB = resolved.filter(function(t){
-      var p = t.direction==='YES' ? t.probability : 100-t.probability;
-      return p>=b.min && p<b.max;
+      var p=t.direction==='YES'?t.probability:100-t.probability;
+      return p>=b.min&&p<b.max;
     });
-    var correct = inB.filter(isWin).length;
-    var mid = (b.min+b.max)/2;
-    return { label:b.label, midpoint:mid, actual: inB.length?(correct/inB.length*100):null, count:inB.length, expected:mid };
+    var correct=inB.filter(isWin).length;
+    var mid=(b.min+b.max)/2;
+    return {label:b.label,midpoint:mid,actual:inB.length?(correct/inB.length*100):null,count:inB.length,expected:mid};
   }).filter(function(d){ return d.count>0; });
 }
 
+// ── SVG Chart ─────────────────────────────────────────────
 function renderLineChart(data, containerId, h) {
   if (!data||!data.length) return;
   var W=680,H=h||200,pl=44,pr=16,pt=10,pb=30;
@@ -477,30 +705,26 @@ function renderLineChart(data, containerId, h) {
   document.getElementById(containerId).innerHTML=svg;
 }
 
+// ── Trade row ─────────────────────────────────────────────
 function tradeRowHTML(t) {
-  var exit = isExit(t);
-  var open = isOpen(t);
-  var win = isWin(t);
-  var outcome = getOutcome(t);
-  var dotColor = open ? '#f59e0b' : exit ? '#f59e0b' : (win ? '#10b981' : '#ef4444');
-  var dotShadow = open ? 'box-shadow:0 0 6px #f59e0b80' : '';
-
-  var statusBadge = '';
+  var exit=isExit(t),open=isOpen(t),win=isWin(t),outcome=getOutcome(t);
+  var dotColor=open?'#f59e0b':exit?'#f59e0b':(win?'#10b981':'#ef4444');
+  var dotShadow=open?'box-shadow:0 0 6px #f59e0b80':'';
+  var statusBadge='';
   if (exit) {
-    var ep = t.exit_price ? t.exit_price+'%' : '?';
-    var epnl = t.exit_pnl != null ? (Number(t.exit_pnl)>=0?'+':'')+Number(t.exit_pnl).toFixed(2) : '?';
-    statusBadge = '<span class="pill" style="background:#f59e0b20;color:#f59e0b">EXIT '+ep+'</span>'
-      +'<span class="pill" style="background:'+(Number(t.exit_pnl)>=0?'#10b98120':'#ef444420')+';color:'+(Number(t.exit_pnl)>=0?'#10b981':'#ef4444')+'">$'+epnl+'</span>';
+    var ep=t.exit_price?t.exit_price+'%':'?';
+    var epnl=t.exit_pnl!=null?(Number(t.exit_pnl)>=0?'+':'')+Number(t.exit_pnl).toFixed(2):'?';
+    statusBadge='<span class="pill" style="background:#f59e0b20;color:#f59e0b">EXIT '+ep+'</span>'
+      +'<span class="pill" style="background:'+(Number(t.exit_pnl)>=0?'#10b98120':'#ef444420')+';color:'+(Number(t.exit_pnl)>=0?'#10b981':'#ef4444')+'"">$'+epnl+'</span>';
   } else if (open) {
-    statusBadge = '<button class="btn-yes" onclick="resolveTrade('+t.id+',\'yes\')">YES</button>'
+    statusBadge='<button class="btn-yes" onclick="resolveTrade('+t.id+',\'yes\')">YES</button>'
       +'<button class="btn-no" onclick="resolveTrade('+t.id+',\'no\')">NO</button>'
       +'<button class="btn-exit" onclick="openExitModal('+t.id+')">EXIT</button>';
   } else {
-    var apnl = t.actual_pnl != null ? (Number(t.actual_pnl)>=0?'+':'')+Number(t.actual_pnl).toFixed(2) : null;
-    statusBadge = '<span class="pill" style="background:'+(win?'#10b98120':'#ef444420')+';color:'+(win?'#10b981':'#ef4444')+'">'+outcome+'</span>'
-      +(apnl ? '<span class="pill" style="background:'+(Number(t.actual_pnl)>=0?'#10b98120':'#ef444420')+';color:'+(Number(t.actual_pnl)>=0?'#10b981':'#ef4444')+'"">$'+apnl+'</span>' : '');
+    var apnl=t.actual_pnl!=null&&t.actual_pnl!==''?(Number(t.actual_pnl)>=0?'+':'')+Number(t.actual_pnl).toFixed(2):null;
+    statusBadge='<span class="pill" style="background:'+(win?'#10b98120':'#ef444420')+';color:'+(win?'#10b981':'#ef4444')+'">'+outcome+'</span>'
+      +(apnl?'<span class="pill" style="background:'+(Number(t.actual_pnl)>=0?'#10b98120':'#ef444420')+';color:'+(Number(t.actual_pnl)>=0?'#10b981':'#ef4444')+'"">$'+apnl+'</span>':'');
   }
-
   return '<div class="trade-row">'
     +'<div class="trade-dot" style="background:'+dotColor+';'+dotShadow+'"></div>'
     +'<div style="flex:1;min-width:0">'
@@ -519,77 +743,63 @@ function tradeRowHTML(t) {
   +'</div>';
 }
 
+// ── Render ────────────────────────────────────────────────
 function renderDashboard() {
-  var s = getStats();
-  var hasData = trades.length > 0;
-  document.getElementById('dash-empty').style.display = hasData ? 'none' : 'block';
-  document.getElementById('dash-sub').textContent = hasData
-    ? s.total+' resolved · '+trades.filter(isOpen).length+' open · '+s.exitCount+' early exits'
-    : '';
-
-  document.getElementById('stat-winrate').textContent = s.total ? s.winRate+'%' : '—';
-  document.getElementById('stat-winrate-sub').textContent = s.total ? s.wins+' of '+s.total+' resolved' : 'no resolved trades';
-
-  var pnlEl = document.getElementById('stat-pnl');
-  pnlEl.textContent = (trades.length&&(s.total||s.exitCount)) ? (Number(s.pnl)>=0?'+':'')+' $'+s.pnl : '—';
-  pnlEl.style.color = Number(s.pnl)>=0 ? '#10b981' : '#ef4444';
-  document.getElementById('stat-pnl-sub').textContent = s.exitCount ? 'incl. $'+s.exitPnl+' from exits' : 'from resolved trades';
-
-  document.getElementById('stat-total').textContent = trades.length;
-  document.getElementById('stat-total-sub').textContent = trades.filter(isOpen).length+' still open';
-
-  document.getElementById('stat-exits').textContent = s.exitCount;
-  var exitNet = Number(s.exitNet);
-  document.getElementById('stat-exits-sub').style.color = exitNet>=0 ? '#10b981' : '#ef4444';
-  document.getElementById('stat-exits-sub').textContent = s.exitCount ? 'net '+(exitNet>=0?'+':'')+' $'+s.exitNet : 'none yet';
-
-  var calData = getCalibration();
-  var calWrap = document.getElementById('dash-cal-wrap');
-  calWrap.style.display = calData.length ? 'block' : 'none';
-  if (calData.length) renderLineChart(calData, 'dash-chart', 200);
-
-  var recentWrap = document.getElementById('dash-recent-wrap');
-  recentWrap.style.display = hasData ? 'block' : 'none';
-  if (hasData) document.getElementById('dash-recent').innerHTML = trades.slice(-5).reverse().map(tradeRowHTML).join('');
+  var s=getStats(),hasData=trades.length>0;
+  document.getElementById('dash-empty').style.display=hasData?'none':'block';
+  document.getElementById('dash-sub').textContent=hasData?s.total+' resolved · '+trades.filter(isOpen).length+' open · '+s.exitCount+' early exits':'';
+  document.getElementById('stat-winrate').textContent=s.total?s.winRate+'%':'—';
+  document.getElementById('stat-winrate-sub').textContent=s.total?s.wins+' of '+s.total+' resolved':'no resolved trades';
+  var pnlEl=document.getElementById('stat-pnl');
+  pnlEl.textContent=(trades.length&&(s.total||s.exitCount))?(Number(s.pnl)>=0?'+':'')+' $'+s.pnl:'—';
+  pnlEl.style.color=Number(s.pnl)>=0?'#10b981':'#ef4444';
+  document.getElementById('stat-pnl-sub').textContent=s.exitCount?'incl. $'+s.exitPnl+' from exits':'from resolved trades';
+  document.getElementById('stat-total').textContent=trades.length;
+  document.getElementById('stat-total-sub').textContent=trades.filter(isOpen).length+' still open';
+  document.getElementById('stat-exits').textContent=s.exitCount;
+  var exitNet=Number(s.exitNet);
+  document.getElementById('stat-exits-sub').style.color=exitNet>=0?'#10b981':'#ef4444';
+  document.getElementById('stat-exits-sub').textContent=s.exitCount?'net '+(exitNet>=0?'+':'')+' $'+s.exitNet:'none yet';
+  var calData=getCalibration();
+  document.getElementById('dash-cal-wrap').style.display=calData.length?'block':'none';
+  if (calData.length) renderLineChart(calData,'dash-chart',200);
+  document.getElementById('dash-recent-wrap').style.display=hasData?'block':'none';
+  if (hasData) document.getElementById('dash-recent').innerHTML=trades.slice(-5).reverse().map(tradeRowHTML).join('');
 }
 
 function renderTrades() {
   var filtered;
-  if (currentFilter==='All') filtered = trades;
-  else if (currentFilter==='Open') filtered = trades.filter(isOpen);
-  else if (currentFilter==='Exits') filtered = trades.filter(isExit);
-  else filtered = trades.filter(function(t){ return t.category===currentFilter; });
-  document.getElementById('trades-count').textContent = trades.length+' total · '+trades.filter(isExit).length+' early exits';
-  var list = document.getElementById('trades-list');
-  if (!filtered.length) { list.innerHTML='<div style="padding:40px;text-align:center;color:#4a5568">No trades in this view yet</div>'; return; }
-  var sorted = filtered.slice().sort(function(a,b){
-    var da = a.date||'', db = b.date||'';
-    return sortOrder==='asc' ? da.localeCompare(db) : db.localeCompare(da);
+  if (currentFilter==='All') filtered=trades;
+  else if (currentFilter==='Open') filtered=trades.filter(isOpen);
+  else if (currentFilter==='Exits') filtered=trades.filter(isExit);
+  else filtered=trades.filter(function(t){ return t.category===currentFilter; });
+  document.getElementById('trades-count').textContent=trades.length+' total · '+trades.filter(isExit).length+' early exits';
+  var list=document.getElementById('trades-list');
+  if (!filtered.length){ list.innerHTML='<div style="padding:40px;text-align:center;color:#4a5568">No trades in this view yet</div>'; return; }
+  var sorted=filtered.slice().sort(function(a,b){
+    var da=a.date||'',db=b.date||'';
+    return sortOrder==='asc'?da.localeCompare(db):db.localeCompare(da);
   });
-  list.innerHTML = sorted.map(tradeRowHTML).join('');
+  list.innerHTML=sorted.map(tradeRowHTML).join('');
 }
 
-function toggleSort() {
-  sortOrder = sortOrder==='desc' ? 'asc' : 'desc';
-  document.getElementById('sort-btn').textContent = sortOrder==='desc' ? '↓ Newest' : '↑ Oldest';
-  renderTrades();
-}
-
-function setFilter(cat, btn) {
-  currentFilter = cat;
+function setFilter(cat,btn) {
+  currentFilter=cat;
   document.querySelectorAll('.filter-btn').forEach(function(b){ b.classList.remove('active'); });
   btn.classList.add('active');
   renderTrades();
 }
 
+function toggleSort() {
+  sortOrder=sortOrder==='desc'?'asc':'desc';
+  document.getElementById('sort-btn').textContent=sortOrder==='desc'?'↓ Newest':'↑ Oldest';
+  renderTrades();
+}
+
 function renderCalibration() {
-  var data = getCalibration();
-  var wrap = document.getElementById('cal-content');
-  if (!data.length) {
-    wrap.innerHTML='<div class="card empty-state"><div style="font-size:40px;margin-bottom:12px">📊</div><div>Resolve some trades to resolution (YES/NO) to see calibration data</div></div>';
-    return;
-  }
-  var cards = data.map(function(d){
+  var data=getCalibration(),wrap=document.getElementById('cal-content');
+  if (!data.length){ wrap.innerHTML='<div class="card empty-state"><div style="font-size:40px;margin-bottom:12px">📊</div><div>Resolve some trades to see calibration data</div></div>'; return; }
+  var cards=data.map(function(d){
     var diff=d.actual-d.expected;
     var color=Math.abs(diff)<10?'#10b981':Math.abs(diff)<20?'#f59e0b':'#ef4444';
     var arrow=diff>=0?'▲':'▼';
@@ -612,88 +822,55 @@ function renderCalibration() {
     +'</div>'
   +'</div>'
   +'<div class="cal-grid">'+cards+'</div>';
-  renderLineChart(data, 'cal-chart', 280);
+  renderLineChart(data,'cal-chart',280);
 }
 
-// ── Status field toggle ───────────────────────────────────
+// ── Form ──────────────────────────────────────────────────
 function toggleStatusFields() {
-  var status = document.getElementById('f-status').value;
-  document.getElementById('exit-fields').style.display = status==='exit' ? 'block' : 'none';
-  document.getElementById('resolved-pnl-field').style.display = (status==='yes'||status==='no') ? 'block' : 'none';
+  var status=document.getElementById('f-status').value;
+  document.getElementById('exit-fields').style.display=status==='exit'?'block':'none';
+  document.getElementById('resolved-pnl-field').style.display=(status==='yes'||status==='no')?'block':'none';
 }
 
-// ── Early exit modal ──────────────────────────────────────
-function openExitModal(id) {
-  exitTargetId = id;
-  document.getElementById('m-exit-price').value = '';
-  document.getElementById('m-exit-pnl').value = '';
-  document.getElementById('exit-modal').classList.add('show');
-}
-function closeExitModal() {
-  exitTargetId = null;
-  document.getElementById('exit-modal').classList.remove('show');
-}
-function confirmExit() {
-  if (!exitTargetId) return;
-  var price = document.getElementById('m-exit-price').value;
-  var pnl = document.getElementById('m-exit-pnl').value;
-  if (!pnl) { alert('Enter your actual P&L (use negative for a loss)'); return; }
-  trades = trades.map(function(t){
-    if (t.id!==exitTargetId) return t;
-    return Object.assign({},t,{status:'exit',exit_price:price?Number(price):null,exit_pnl:Number(pnl)});
-  });
-  save(); showToast('Closed early — P&L recorded');
-  closeExitModal();
-  var active = document.querySelector('.page.active').id.replace('page-','');
-  if (active==='dashboard') renderDashboard();
-  if (active==='trades') renderTrades();
-}
-
-// ── Add / Edit ────────────────────────────────────────────
 function submitTrade() {
-  var market = document.getElementById('f-market').value.trim();
-  var prob = Number(document.getElementById('f-prob').value);
-  var stake = Number(document.getElementById('f-stake').value);
-  if (!market||!prob||!stake) { showToast('Fill in market, probability, and stake'); return; }
-  var status = document.getElementById('f-status').value;
-  var exitPrice = status==='exit' ? Number(document.getElementById('f-exit-price').value)||null : null;
-  var exitPnl = status==='exit' ? Number(document.getElementById('f-exit-pnl').value)||null : null;
-  var actualPnlRaw = document.getElementById('f-actual-pnl').value;
-  var actualPnl = (status==='yes'||status==='no') && actualPnlRaw!=='' ? Number(actualPnlRaw) : null;
-  var t = {
-    id: editId||Date.now(),
-    market:market, category:document.getElementById('f-category').value,
-    platform:'Kalshi', direction:document.getElementById('f-direction').value,
-    probability:prob, stake:stake, date:document.getElementById('f-date').value,
-    status:status, exit_price:exitPrice, exit_pnl:exitPnl, actual_pnl:actualPnl,
+  var market=document.getElementById('f-market').value.trim();
+  var prob=Number(document.getElementById('f-prob').value);
+  var stake=Number(document.getElementById('f-stake').value);
+  if (!market||!prob||!stake){ showToast('Fill in market, probability, and stake'); return; }
+  var status=document.getElementById('f-status').value;
+  var exitPrice=status==='exit'?Number(document.getElementById('f-exit-price').value)||null:null;
+  var exitPnl=status==='exit'?Number(document.getElementById('f-exit-pnl').value)||null:null;
+  var actualPnlRaw=document.getElementById('f-actual-pnl').value;
+  var actualPnl=(status==='yes'||status==='no')&&actualPnlRaw!==''?Number(actualPnlRaw):null;
+  var t={
+    id:editId||Date.now(),
+    market:market,category:document.getElementById('f-category').value,
+    platform:'Kalshi',direction:document.getElementById('f-direction').value,
+    probability:prob,stake:stake,date:document.getElementById('f-date').value,
+    status:status,exit_price:exitPrice,exit_pnl:exitPnl,actual_pnl:actualPnl,
     notes:document.getElementById('f-notes').value.trim()
   };
-  if (editId) { trades=trades.map(function(x){ return x.id===editId?t:x; }); showToast('Trade updated'); }
+  if (editId){ trades=trades.map(function(x){ return x.id===editId?t:x; }); showToast('Trade updated'); }
   else { trades.push(t); showToast('Trade added'); }
-  save(); cancelEdit(); showPage('trades');
+  saveAllToSheet();
+  cancelEdit(); showPage('trades');
 }
 
 function editTrade(id) {
-  var t = trades.find(function(x){ return x.id===id; });
+  var t=trades.find(function(x){ return x.id==id; });
   if (!t) return;
-  editId = id;
+  editId=t.id;
   document.getElementById('f-market').value=t.market;
   document.getElementById('f-category').value=t.category;
   document.getElementById('f-direction').value=t.direction;
   document.getElementById('f-prob').value=t.probability;
   document.getElementById('f-stake').value=t.stake;
   calInit(t.date);
-  // map legacy fields
-  var status = t.status || (t.resolved?(t.outcome==='YES'?'yes':'no'):'open');
+  var status=t.status||(t.resolved?(t.outcome==='YES'?'yes':'no'):'open');
   document.getElementById('f-status').value=status;
   document.getElementById('f-notes').value=t.notes||'';
-  if (status==='exit') {
-    document.getElementById('f-exit-price').value=t.exit_price||'';
-    document.getElementById('f-exit-pnl').value=t.exit_pnl||'';
-  }
-  if (status==='yes'||status==='no') {
-    document.getElementById('f-actual-pnl').value=t.actual_pnl!=null?t.actual_pnl:'';
-  }
+  if (status==='exit'){ document.getElementById('f-exit-price').value=t.exit_price||''; document.getElementById('f-exit-pnl').value=t.exit_pnl||''; }
+  if (status==='yes'||status==='no'){ document.getElementById('f-actual-pnl').value=t.actual_pnl!=null?t.actual_pnl:''; }
   toggleStatusFields();
   document.getElementById('add-title').textContent='Edit Trade';
   document.getElementById('add-submit-btn').textContent='Save Changes';
@@ -709,7 +886,6 @@ function cancelEdit() {
   document.getElementById('f-direction').value='YES';
   document.getElementById('f-prob').value='';
   document.getElementById('f-stake').value='';
-  document.getElementById('f-date').value=new Date().toISOString().slice(0,10);
   document.getElementById('f-status').value='open';
   document.getElementById('f-exit-price').value='';
   document.getElementById('f-exit-pnl').value='';
@@ -717,16 +893,16 @@ function cancelEdit() {
   document.getElementById('f-notes').value='';
   document.getElementById('exit-fields').style.display='none';
   document.getElementById('resolved-pnl-field').style.display='none';
-  calInit(new Date().toISOString().slice(0,10));
   document.getElementById('add-title').textContent='Log Trade';
   document.getElementById('add-submit-btn').textContent='Add Trade';
   document.getElementById('cancel-edit-btn').style.display='none';
   document.getElementById('add-nav-btn').textContent='+ add';
+  calInit(new Date().toISOString().slice(0,10));
 }
 
 function resolveTrade(id, status) {
-  trades=trades.map(function(t){ return t.id===id?Object.assign({},t,{status:status}):t; });
-  save(); showToast('Resolved '+status.toUpperCase());
+  trades=trades.map(function(t){ return t.id==id?Object.assign({},t,{status:status}):t; });
+  saveAllToSheet(); showToast('Resolved '+status.toUpperCase());
   var active=document.querySelector('.page.active').id.replace('page-','');
   if (active==='dashboard') renderDashboard();
   if (active==='trades') renderTrades();
@@ -734,13 +910,43 @@ function resolveTrade(id, status) {
 
 function deleteTrade(id) {
   if (!confirm('Delete this trade?')) return;
-  trades=trades.filter(function(t){ return t.id!==id; });
-  save(); showToast('Trade deleted');
+  trades=trades.filter(function(t){ return t.id!=id; });
+  saveAllToSheet(); showToast('Trade deleted');
   var active=document.querySelector('.page.active').id.replace('page-','');
   if (active==='dashboard') renderDashboard();
   if (active==='trades') renderTrades();
 }
 
+// ── Exit modal ────────────────────────────────────────────
+function openExitModal(id) {
+  exitTargetId=id;
+  document.getElementById('m-exit-price').value='';
+  document.getElementById('m-exit-pnl').value='';
+  document.getElementById('exit-modal').classList.add('show');
+}
+function closeExitModal() {
+  exitTargetId=null;
+  document.getElementById('exit-modal').classList.remove('show');
+}
+function confirmExit() {
+  if (!exitTargetId) return;
+  var price=document.getElementById('m-exit-price').value;
+  var pnl=document.getElementById('m-exit-pnl').value;
+  if (!pnl){ alert('Enter your actual P&L'); return; }
+  trades=trades.map(function(t){
+    if (t.id!=exitTargetId) return t;
+    return Object.assign({},t,{status:'exit',exit_price:price?Number(price):null,exit_pnl:Number(pnl)});
+  });
+  saveAllToSheet(); showToast('Closed early — P&L recorded');
+  closeExitModal();
+  var active=document.querySelector('.page.active').id.replace('page-','');
+  if (active==='dashboard') renderDashboard();
+  if (active==='trades') renderTrades();
+}
+
+document.getElementById('exit-modal').addEventListener('click',function(e){ if(e.target===this) closeExitModal(); });
+
+// ── CSV ───────────────────────────────────────────────────
 function exportCSV() {
   var headers='market,category,platform,probability,direction,stake,status,exit_price,exit_pnl,actual_pnl,date,notes';
   var rows=trades.map(function(t){
@@ -758,123 +964,202 @@ function importCSV(e) {
     var lines=ev.target.result.trim().split('\n');
     var headers=lines[0].split(',').map(function(h){return h.trim().toLowerCase();});
     var newTrades=lines.slice(1).filter(function(l){return l.trim();}).map(function(line,i){
-      var vals=line.split(',').map(function(v){return v.trim();}), obj={};
+      var vals=line.split(',').map(function(v){return v.trim();}),obj={};
       headers.forEach(function(h,idx){obj[h]=vals[idx];});
       return {
-        id:Date.now()+i, market:obj.market||'', category:obj.category||'Sports',
-        platform:obj.platform||'Kalshi', probability:Number(obj.probability)||50,
-        direction:obj.direction||'YES', stake:Number(obj.stake)||10,
+        id:Date.now()+i,market:obj.market||'',category:obj.category||'Sports',
+        platform:obj.platform||'Kalshi',probability:Number(obj.probability)||50,
+        direction:obj.direction||'YES',stake:Number(obj.stake)||10,
         status:obj.status||'open',
         exit_price:obj.exit_price?Number(obj.exit_price):null,
         exit_pnl:obj.exit_pnl?Number(obj.exit_pnl):null,
         actual_pnl:obj.actual_pnl!==undefined&&obj.actual_pnl!==''?Number(obj.actual_pnl):null,
-        date:obj.date||new Date().toISOString().slice(0,10), notes:obj.notes||''
+        date:obj.date||new Date().toISOString().slice(0,10),notes:obj.notes||''
       };
     });
-    trades=trades.concat(newTrades); save(); showToast('Imported '+newTrades.length+' trades'); renderTrades();
+    trades=trades.concat(newTrades);
+    saveAllToSheet(); showToast('Imported '+newTrades.length+' trades'); renderTrades();
   };
   reader.readAsText(file); e.target.value='';
 }
 
-// close modal on overlay click
-document.getElementById('exit-modal').addEventListener('click', function(e){
-  if (e.target===this) closeExitModal();
-});
-
-// ── Custom Calendar ───────────────────────────────────────
-var calYear, calMonth, calSelectedDate;
-
-function calInit(dateStr) {
-  var d = dateStr ? new Date(dateStr+'T12:00:00') : new Date();
-  calSelectedDate = dateStr || toDateStr(new Date());
-  calYear = d.getFullYear();
-  calMonth = d.getMonth();
-  calRender();
-  updateCalDisplay();
+// ── Calendar ──────────────────────────────────────────────
+var calYear,calMonth,calSelectedDate;
+function calInit(dateStr){
+  var d=dateStr?new Date(dateStr+'T12:00:00'):new Date();
+  calSelectedDate=dateStr||toDateStr(new Date());
+  calYear=d.getFullYear(); calMonth=d.getMonth();
+  calRender(); updateCalDisplay();
 }
-
-function toDateStr(d) {
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+function toDateStr(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function updateCalDisplay(){
+  document.getElementById('f-date').value=calSelectedDate||'';
+  var d=calSelectedDate?new Date(calSelectedDate+'T12:00:00'):new Date();
+  var months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('cal-display').textContent=months[d.getMonth()]+' '+d.getDate()+', '+d.getFullYear();
 }
-
-function updateCalDisplay() {
-  document.getElementById('f-date').value = calSelectedDate || '';
-  var d = calSelectedDate ? new Date(calSelectedDate+'T12:00:00') : new Date();
-  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  document.getElementById('cal-display').textContent = months[d.getMonth()]+' '+d.getDate()+', '+d.getFullYear();
-}
-
-function calRender() {
-  var months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  document.getElementById('cal-month-label').textContent = months[calMonth]+' '+calYear;
-  var grid = document.getElementById('cal-dates');
-  var today = toDateStr(new Date());
-  var firstDay = new Date(calYear, calMonth, 1).getDay();
-  var daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
-  var daysInPrev = new Date(calYear, calMonth, 0).getDate();
-  var html = '';
-  // prev month padding
-  for (var i=firstDay-1; i>=0; i--) {
-    html += '<button type="button" class="cal-date other-month" onclick="calSelect(\''
-      + toDateStr(new Date(calYear, calMonth-1, daysInPrev-i)) + '\')">'+(daysInPrev-i)+'</button>';
+function calRender(){
+  var months=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('cal-month-label').textContent=months[calMonth]+' '+calYear;
+  var grid=document.getElementById('cal-dates');
+  var today=toDateStr(new Date());
+  var firstDay=new Date(calYear,calMonth,1).getDay();
+  var daysInMonth=new Date(calYear,calMonth+1,0).getDate();
+  var daysInPrev=new Date(calYear,calMonth,0).getDate();
+  var html='';
+  for (var i=firstDay-1;i>=0;i--) html+='<button type="button" class="cal-date other-month" onclick="calSelect(\''+toDateStr(new Date(calYear,calMonth-1,daysInPrev-i))+'\')">'+( daysInPrev-i)+'</button>';
+  for (var d=1;d<=daysInMonth;d++){
+    var ds=toDateStr(new Date(calYear,calMonth,d));
+    var cls='cal-date'+(ds===today?' today':'')+(ds===calSelectedDate?' selected':'');
+    html+='<button type="button" class="'+cls+'" onclick="calSelect(\''+ds+'\')">'+d+'</button>';
   }
-  // current month
-  for (var d=1; d<=daysInMonth; d++) {
-    var ds = toDateStr(new Date(calYear, calMonth, d));
-    var cls = 'cal-date';
-    if (ds===today) cls += ' today';
-    if (ds===calSelectedDate) cls += ' selected';
-    html += '<button type="button" class="'+cls+'" onclick="calSelect(\''+ds+'\')">'+d+'</button>';
-  }
-  // next month padding
-  var total = firstDay + daysInMonth;
-  var remaining = total % 7 === 0 ? 0 : 7 - (total % 7);
-  for (var n=1; n<=remaining; n++) {
-    html += '<button type="button" class="cal-date other-month" onclick="calSelect(\''
-      + toDateStr(new Date(calYear, calMonth+1, n)) + '\')">' + n + '</button>';
-  }
-  grid.innerHTML = html;
+  var total=firstDay+daysInMonth,remaining=total%7===0?0:7-(total%7);
+  for (var n=1;n<=remaining;n++) html+='<button type="button" class="cal-date other-month" onclick="calSelect(\''+toDateStr(new Date(calYear,calMonth+1,n))+'\')">'+n+'</button>';
+  grid.innerHTML=html;
 }
-
-function calSelect(dateStr) {
-  calSelectedDate = dateStr;
-  var d = new Date(dateStr+'T12:00:00');
-  calYear = d.getFullYear();
-  calMonth = d.getMonth();
-  calRender();
-  updateCalDisplay();
+function calSelect(dateStr){
+  calSelectedDate=dateStr;
+  var d=new Date(dateStr+'T12:00:00');
+  calYear=d.getFullYear(); calMonth=d.getMonth();
+  calRender(); updateCalDisplay();
   document.getElementById('cal-dropdown').classList.remove('open');
   document.getElementById('cal-trigger').classList.remove('open');
 }
-
-function calNav(dir) {
-  calMonth += dir;
-  if (calMonth > 11) { calMonth = 0; calYear++; }
-  if (calMonth < 0) { calMonth = 11; calYear--; }
+function calNav(dir){
+  calMonth+=dir;
+  if (calMonth>11){calMonth=0;calYear++;} if (calMonth<0){calMonth=11;calYear--;}
   calRender();
 }
-
-function toggleCal() {
-  var dd = document.getElementById('cal-dropdown');
-  var tr = document.getElementById('cal-trigger');
-  var isOpen = dd.classList.contains('open');
-  if (isOpen) { dd.classList.remove('open'); tr.classList.remove('open'); }
-  else { dd.classList.add('open'); tr.classList.add('open'); calRender(); }
+function toggleCal(){
+  var dd=document.getElementById('cal-dropdown'),tr=document.getElementById('cal-trigger');
+  var isOpen=dd.classList.contains('open');
+  if (isOpen){dd.classList.remove('open');tr.classList.remove('open');}
+  else{dd.classList.add('open');tr.classList.add('open');calRender();}
 }
-
-// close calendar when clicking outside
-document.addEventListener('click', function(e) {
-  var wrap = document.querySelector('.cal-picker-wrap');
-  if (wrap && !wrap.contains(e.target)) {
+document.addEventListener('click',function(e){
+  var wrap=document.querySelector('.cal-picker-wrap');
+  if (wrap&&!wrap.contains(e.target)){
     document.getElementById('cal-dropdown').classList.remove('open');
     document.getElementById('cal-trigger').classList.remove('open');
   }
 });
 
+// ── Calculator ────────────────────────────────────────────
+var calcMode = 'resolved';
+var calcLots = [];
+
+function setCalcMode(mode) {
+  calcMode = mode;
+  document.getElementById('calc-resolved-fields').style.display = mode==='resolved' ? 'block' : 'none';
+  document.getElementById('calc-exit-fields').style.display = mode==='exit' ? 'block' : 'none';
+  var rb = document.getElementById('calc-mode-resolved');
+  var eb = document.getElementById('calc-mode-exit');
+  rb.style.background = mode==='resolved' ? '#10b98120' : '#1a1f2e';
+  rb.style.color = mode==='resolved' ? '#10b981' : '#8b9ab0';
+  rb.style.border = mode==='resolved' ? '1px solid #10b98140' : 'none';
+  eb.style.background = mode==='exit' ? '#6366f120' : '#1a1f2e';
+  eb.style.color = mode==='exit' ? '#6366f1' : '#8b9ab0';
+  eb.style.border = mode==='exit' ? '1px solid #6366f140' : 'none';
+  calcUpdate();
+}
+
+function initCalc() {
+  calcLots = [
+    { contracts: '', price: '' },
+    { contracts: '', price: '' }
+  ];
+  renderCalcLots();
+  calcUpdate();
+}
+
+function addCalcLot() {
+  calcLots.push({ contracts: '', price: '' });
+  renderCalcLots();
+}
+
+function removeCalcLot(i) {
+  if (calcLots.length <= 1) return;
+  calcLots.splice(i, 1);
+  renderCalcLots();
+  calcUpdate();
+}
+
+function renderCalcLots() {
+  var html = '';
+  calcLots.forEach(function(lot, i) {
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin-bottom:10px">'
+      + '<div><label class="form-label">LOT '+(i+1)+' — CONTRACTS</label>'
+      + '<input class="input-field" type="number" min="1" placeholder="e.g. 10" value="'+( lot.contracts||'')+'" oninput="calcLots['+i+'].contracts=this.value;calcUpdate()" /></div>'
+      + '<div><label class="form-label">ENTRY PRICE (¢)</label>'
+      + '<input class="input-field" type="number" min="1" max="99" placeholder="e.g. 45" value="'+(lot.price||'')+'" oninput="calcLots['+i+'].price=this.value;calcUpdate()" /></div>'
+      + '<button class="btn-danger" style="margin-bottom:1px;height:38px;padding:0 10px" onclick="removeCalcLot('+i+')">✕</button>'
+      + '</div>';
+  });
+  document.getElementById('calc-lots').innerHTML = html;
+}
+
+function calcUpdate() {
+  var valid = calcLots.every(function(l){ return l.contracts && l.price; });
+  var resultsEl = document.getElementById('calc-results');
+
+  if (!valid) { resultsEl.style.display = 'none'; return; }
+
+  var lots = calcLots.map(function(l) {
+    return { contracts: Number(l.contracts), price: Number(l.price)/100, cost: Number(l.contracts) * Number(l.price)/100 };
+  });
+  var totalCost = lots.reduce(function(a,l){ return a+l.cost; }, 0);
+
+  var results;
+  if (calcMode === 'resolved') {
+    // Each contract pays $1 at resolution
+    results = lots.map(function(l, i) {
+      var proceeds = l.contracts * 1.00;
+      var pnl = proceeds - l.cost;
+      return { lot: i+1, contracts: l.contracts, price: l.price, cost: l.cost, proceeds: proceeds, pnl: pnl };
+    });
+  } else {
+    var totalProceeds = Number(document.getElementById('calc-proceeds').value) || 0;
+    results = lots.map(function(l, i) {
+      var share = totalCost > 0 ? l.cost / totalCost : 1 / lots.length;
+      var proceeds = totalProceeds * share;
+      var pnl = proceeds - l.cost;
+      return { lot: i+1, contracts: l.contracts, price: l.price, cost: l.cost, proceeds: proceeds, pnl: pnl };
+    });
+  }
+
+  var totalPnl = results.reduce(function(a,r){ return a+r.pnl; }, 0);
+
+  var bodyHtml = '<div style="display:grid;grid-template-columns:auto 1fr 1fr 1fr 1fr;gap:8px 16px;align-items:center;font-size:12px">'
+    + '<div style="color:#4a5568;letter-spacing:0.08em">LOT</div>'
+    + '<div style="color:#4a5568;letter-spacing:0.08em">CONTRACTS</div>'
+    + '<div style="color:#4a5568;letter-spacing:0.08em">COST</div>'
+    + '<div style="color:#4a5568;letter-spacing:0.08em">PROCEEDS</div>'
+    + '<div style="color:#4a5568;letter-spacing:0.08em">P&amp;L</div>';
+
+  results.forEach(function(r) {
+    var pnlColor = r.pnl >= 0 ? '#10b981' : '#ef4444';
+    var pnlSign = r.pnl >= 0 ? '+' : '';
+    bodyHtml += '<div style="color:#6366f1;font-weight:700">Lot '+r.lot+'</div>'
+      + '<div style="color:#e2e8f0">'+r.contracts+' @ '+(r.price*100).toFixed(0)+'¢</div>'
+      + '<div style="color:#e2e8f0">$'+r.cost.toFixed(2)+'</div>'
+      + '<div style="color:#e2e8f0">$'+r.proceeds.toFixed(2)+'</div>'
+      + '<div style="color:'+pnlColor+';font-weight:700">'+pnlSign+'$'+r.pnl.toFixed(2)+'</div>';
+  });
+  bodyHtml += '</div>';
+
+  document.getElementById('calc-results-body').innerHTML = bodyHtml;
+  var totalEl = document.getElementById('calc-total-pnl');
+  totalEl.textContent = (totalPnl >= 0 ? '+' : '') + '$' + totalPnl.toFixed(2);
+  totalEl.style.color = totalPnl >= 0 ? '#10b981' : '#ef4444';
+  resultsEl.style.display = 'block';
+}
+
 // ── Init ──────────────────────────────────────────────────
-load();
-calInit(new Date().toISOString().slice(0,10));
-renderDashboard();
+window.onload = function() {
+  setupTokenClient();
+  tokenClient.requestAccessToken({ prompt: '' });
+  initCalc();
+};
 </script>
 </body>
 </html>
