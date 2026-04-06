@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>EDGE — Kalshi Tracker</title>
+<title>ma.estro — Kalshi Tracker</title>
 
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -111,6 +111,30 @@ select.input-field option { background: #0f1117; }
 .cal-date.selected { background: #10b981; color: #080b12; font-weight: 700; }
 .cal-date.other-month { color: #2a2d3a; }
 
+/* Wiki */
+.wiki-layout { display: grid; grid-template-columns: 220px 1fr; gap: 32px; align-items: start; }
+.wiki-nav { position: sticky; top: 92px; background: #0f1117; border: 1px solid #1e2230; border-radius: 12px; padding: 16px 0; }
+.wiki-nav-section { padding: 6px 20px 2px; color: #4a5568; font-size: 10px; letter-spacing: 0.12em; margin-top: 8px; }
+.wiki-nav-item { display: block; width: 100%; background: none; border: none; text-align: left; padding: 7px 20px; font-family: inherit; font-size: 12px; color: #8b9ab0; cursor: pointer; transition: all 0.15s; border-left: 2px solid transparent; }
+.wiki-nav-item:hover { color: #e2e8f0; background: #1a1f2e; }
+.wiki-nav-item.active { color: #10b981; border-left-color: #10b981; background: #10b98108; }
+.wiki-content { min-width: 0; }
+.wiki-article { display: none; }
+.wiki-article.active { display: block; }
+.wiki-article h2 { font-family: Georgia, serif; font-size: 22px; font-weight: 700; margin-bottom: 6px; letter-spacing: -0.02em; }
+.wiki-article .wiki-lead { color: #8b9ab0; font-size: 13px; margin-bottom: 28px; line-height: 1.7; border-bottom: 1px solid #1e2230; padding-bottom: 20px; }
+.wiki-article h3 { font-family: Georgia, serif; font-size: 15px; font-weight: 700; margin: 28px 0 10px; color: #e2e8f0; }
+.wiki-article p { color: #8b9ab0; font-size: 13px; line-height: 1.8; margin-bottom: 14px; }
+.wiki-article code { background: #1a1f2e; color: #10b981; padding: 2px 7px; border-radius: 4px; font-family: inherit; font-size: 12px; }
+.wiki-table { width: 100%; border-collapse: collapse; margin: 16px 0 24px; font-size: 12px; }
+.wiki-table th { text-align: left; color: #4a5568; letter-spacing: 0.1em; font-size: 10px; padding: 8px 12px; border-bottom: 1px solid #1e2230; }
+.wiki-table td { padding: 10px 12px; border-bottom: 1px solid #1e223060; color: #8b9ab0; line-height: 1.6; }
+.wiki-table td:first-child { color: #e2e8f0; font-weight: 600; white-space: nowrap; }
+.wiki-callout { background: #10b98110; border: 1px solid #10b98130; border-radius: 8px; padding: 14px 18px; margin: 16px 0; font-size: 12px; color: #10b981; line-height: 1.7; }
+.wiki-callout.warn { background: #f59e0b10; border-color: #f59e0b30; color: #f59e0b; }
+.wiki-callout.danger { background: #ef444410; border-color: #ef444430; color: #ef4444; }
+.wiki-tag { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 11px; margin: 2px 3px 2px 0; }
+
 /* Modal */
 .modal-overlay { display: none; position: fixed; inset: 0; background: #000000aa; z-index: 200; align-items: center; justify-content: center; }
 .modal-overlay.show { display: flex; }
@@ -125,7 +149,7 @@ select.input-field option { background: #0f1117; }
   <div class="header-inner">
     <div class="logo">
       <div class="logo-dot" id="sync-dot"></div>
-      <span class="logo-title">EDGE</span>
+      <span class="logo-title" style="font-family:Georgia,serif;letter-spacing:-0.03em">ma<span style="color:#10b981">.</span>estro</span>
       <span class="logo-sep">/</span>
       <span class="logo-sub">KALSHI TRACKER</span>
     </div>
@@ -137,6 +161,7 @@ select.input-field option { background: #0f1117; }
         <button class="nav-btn" onclick="showPage('calibration')">calibration</button>
         <button class="nav-btn" id="add-nav-btn" onclick="showPage('add')">+ add</button>
         <button class="nav-btn" onclick="showPage('calc')">⊕ calc</button>
+        <button class="nav-btn" onclick="showPage('wiki')">wiki</button>
       </nav>
     </div>
   </div>
@@ -365,6 +390,201 @@ select.input-field option { background: #0f1117; }
     </div>
   </div>
 
+  <!-- WIKI -->
+  <div class="page" id="page-wiki">
+    <div style="margin-bottom:28px">
+      <div class="section-title">Wiki</div>
+      <div class="section-sub">Reference guide for concepts, metrics, and strategy</div>
+    </div>
+    <div class="wiki-layout">
+
+      <!-- Sidebar nav -->
+      <div class="wiki-nav">
+        <div class="wiki-nav-section">METRICS</div>
+        <button class="wiki-nav-item active" onclick="showWiki('brier')">Brier Score</button>
+        <button class="wiki-nav-item" onclick="showWiki('calibration')">Calibration</button>
+        <button class="wiki-nav-item" onclick="showWiki('sharpe')">Sharpe Ratio</button>
+        <button class="wiki-nav-item" onclick="showWiki('clv')">Closing Line Value</button>
+        <div class="wiki-nav-section">STRATEGY</div>
+        <button class="wiki-nav-item" onclick="showWiki('buckets')">Bucket Analysis</button>
+        <button class="wiki-nav-item" onclick="showWiki('sizing')">Position Sizing</button>
+        <button class="wiki-nav-item" onclick="showWiki('exits')">Early Exits</button>
+        <div class="wiki-nav-section">REFERENCE</div>
+        <button class="wiki-nav-item" onclick="showWiki('glossary')">Glossary</button>
+      </div>
+
+      <!-- Articles -->
+      <div class="wiki-content">
+
+        <!-- Brier Score -->
+        <div class="wiki-article active" id="wiki-brier">
+          <h2>Brier Score</h2>
+          <p class="wiki-lead">A single number that measures how accurate your probability predictions are. Lower is better. It's the standard scoring method for binary forecasting — the prediction market equivalent of MAPE.</p>
+          <h3>The Formula</h3>
+          <p>For each resolved trade: <code>(predicted probability − actual outcome)²</code></p>
+          <p>Outcome is 1 if the event happened (YES resolved), 0 if it didn't (NO resolved). Average across all resolved trades for your overall score.</p>
+          <h3>Score Benchmarks</h3>
+          <table class="wiki-table">
+            <thead><tr><th>SCORE</th><th>WHAT IT MEANS</th><th>CONTEXT</th></tr></thead>
+            <tbody>
+              <tr><td>&lt; 0.10</td><td>Elite</td><td>Superforecasters on Metaculus with thousands of trades</td></tr>
+              <tr><td>0.10 – 0.15</td><td>Very good</td><td>Real edge, solid calibration — aspire to be here</td></tr>
+              <tr><td>0.15 – 0.20</td><td>Decent</td><td>Better than most, room to sharpen — realistic target</td></tr>
+              <tr><td>0.20 – 0.25</td><td>Coin-flip territory</td><td>Not adding much over random guessing</td></tr>
+              <tr><td>&gt; 0.25</td><td>Worse than random</td><td>Actively miscalibrated</td></tr>
+            </tbody>
+          </table>
+          <h3>Why Squaring Matters</h3>
+          <p>The squaring is intentional — it punishes confident wrong predictions disproportionately. Saying 90% on something that doesn't happen scores <code>(0.90 − 0)² = 0.81</code>. Saying 60% on the same outcome scores only <code>0.36</code>. This creates an incentive to only go high-conviction when you actually have edge.</p>
+          <div class="wiki-callout danger">Being confidently wrong is far more damaging than being uncertain and wrong. Never inflate your probability to match the market price — log what you actually believe.</div>
+          <h3>How to Improve It</h3>
+          <p><strong style="color:#e2e8f0">Fix overconfidence in high buckets.</strong> Check the calibration page. If your 80–90% bucket is underperforming, shade your stated probability down or stop betting there.</p>
+          <p><strong style="color:#e2e8f0">Separate Sports vs Current Events.</strong> Most people are better calibrated in one category. Lean into your stronger one.</p>
+          <p><strong style="color:#e2e8f0">Watch the L20 rolling score.</strong> The overall average is dragged by old trades. The last-20 on the dashboard shows current form.</p>
+          <div class="wiki-callout">Target: under 0.20 is good. Under 0.15 is the aspirational goal for Kalshi-style binary markets.</div>
+        </div>
+
+        <!-- Calibration -->
+        <div class="wiki-article" id="wiki-calibration">
+          <h2>Calibration</h2>
+          <p class="wiki-lead">Calibration measures whether your predicted probabilities match your actual win rates across many trades. If you say 70% on 20 different trades, you should win roughly 14 of them. If you win 18, you're underconfident. If you win 10, you're overconfident.</p>
+          <h3>How the Calibration Chart Works</h3>
+          <p>Trades are grouped into 10-percentage-point buckets based on your effective probability — the probability that your direction wins. A YES bet at 75% has an effective probability of 75%. A NO bet at 30% has an effective probability of 70%.</p>
+          <p>The dashed line is perfect calibration. Your green line is actual performance. Points above the dashed line mean you're winning more than expected — potential edge. Points below mean you're getting burned.</p>
+          <h3>Edge Labels</h3>
+          <table class="wiki-table">
+            <thead><tr><th>LABEL</th><th>CONDITION</th><th>WHAT TO DO</th></tr></thead>
+            <tbody>
+              <tr><td>Strong Edge</td><td>Winning 20%+ more than expected</td><td>Bet more here — market underpricing you</td></tr>
+              <tr><td>Possible Edge</td><td>Winning 10–20% more than expected</td><td>Watch and accumulate more data</td></tr>
+              <tr><td>Efficient</td><td>Within 10% of expected</td><td>Market is fairly priced here</td></tr>
+              <tr><td>Slight Bleed</td><td>Losing 10–20% more than expected</td><td>Monitor — could be variance</td></tr>
+              <tr><td>Getting Burned</td><td>Losing 20%+ more than expected</td><td>Avoid or fade this bucket</td></tr>
+            </tbody>
+          </table>
+          <div class="wiki-callout warn">Early exits are excluded from calibration. They count toward P&L but not toward your probability accuracy — since the outcome was never resolved, there's nothing to score against.</div>
+          <h3>Sample Size Warning</h3>
+          <p>A bucket with fewer than 10 trades is statistically unreliable. A 3-trade bucket showing "Strong Edge" could easily be noise. Use calibration labels directionally, and weight them more heavily as trade counts grow.</p>
+        </div>
+
+        <!-- Sharpe Ratio -->
+        <div class="wiki-article" id="wiki-sharpe">
+          <h2>Sharpe Ratio</h2>
+          <p class="wiki-lead">Named after economist William Sharpe, this measures risk-adjusted return — how much profit you're making relative to how volatile your results are. A high Sharpe means consistent profits. A low Sharpe means your results are noisy, even if the average is positive.</p>
+          <h3>The Formula</h3>
+          <p><code>(average return − risk-free rate) / standard deviation of returns</code></p>
+          <p>In a prediction market context, the risk-free rate is typically set to 0, so it simplifies to mean return divided by the volatility of your returns across trades.</p>
+          <h3>Benchmarks</h3>
+          <table class="wiki-table">
+            <thead><tr><th>SHARPE</th><th>INTERPRETATION</th></tr></thead>
+            <tbody>
+              <tr><td>&lt; 0</td><td>Losing money on average</td></tr>
+              <tr><td>0 – 0.5</td><td>Weak — wins are masking losses</td></tr>
+              <tr><td>0.5 – 1.0</td><td>Acceptable but inconsistent</td></tr>
+              <tr><td>1.0 – 2.0</td><td>Good — consistent edge</td></tr>
+              <tr><td>&gt; 2.0</td><td>Strong — repeatable, low-noise edge</td></tr>
+            </tbody>
+          </table>
+          <h3>Why It Matters for Kalshi</h3>
+          <p>Your P&L total can look positive while hiding the fact that you had one big lucky win and many small losses. Sharpe exposes this. Two traders with identical total P&L can have very different Sharpe ratios — the one with consistent, lower-variance wins is the better forecaster.</p>
+          <div class="wiki-callout">ma.estro doesn't currently calculate Sharpe automatically, but you can track it in your Sheet using the actual_pnl column. Sharpe is most meaningful after 50+ resolved trades.</div>
+        </div>
+
+        <!-- CLV -->
+        <div class="wiki-article" id="wiki-clv">
+          <h2>Closing Line Value (CLV)</h2>
+          <p class="wiki-lead">CLV measures whether the market moved toward or away from your position after you placed your bet. It's widely considered the single best indicator of long-term forecasting edge — better than win rate alone.</p>
+          <h3>How It Works</h3>
+          <p>If you buy YES at 60% and the market closes at 75%, you have positive CLV — the market came around to your view. If it closes at 45%, you had negative CLV — the market moved against you even if you happened to win.</p>
+          <p><code>CLV = closing probability − your entry probability</code> (for YES bets, flip sign for NO bets)</p>
+          <h3>Why CLV Beats Win Rate</h3>
+          <p>Win rate is noisy in the short term — you can be right for the wrong reasons. CLV strips out luck. If you consistently buy before the market moves your way, you have genuine information edge. If your CLV is negative but your win rate is positive, you're running hot and it likely won't last.</p>
+          <div class="wiki-callout warn">To track CLV, you need to log the market's closing price at resolution — not just your entry. Consider adding a closing_prob column to your Sheet and tracking this manually for a few months before building automation around it.</div>
+          <h3>CLV and Kalshi</h3>
+          <p>Kalshi markets are relatively thin compared to sports books, which means CLV signals are noisier. A single large trader can move a market. Use CLV directionally, not as a precise number, especially in lower-volume markets.</p>
+        </div>
+
+        <!-- Bucket Analysis -->
+        <div class="wiki-article" id="wiki-buckets">
+          <h2>Bucket Analysis</h2>
+          <p class="wiki-lead">Bucket analysis groups your trades by predicted probability range and asks: within each range, are you winning at the rate you expected? It's how you find where your edge actually lives.</p>
+          <h3>Reading the Drill-Down</h3>
+          <p>Click any bucket card on the calibration page to see every individual trade in that range. Look for patterns: are your losses clustered in certain market types? Certain time periods? Certain categories?</p>
+          <h3>Acting on Buckets</h3>
+          <table class="wiki-table">
+            <thead><tr><th>SITUATION</th><th>ACTION</th></tr></thead>
+            <tbody>
+              <tr><td>Strong edge bucket, low trade count</td><td>Actively look for more markets in this range</td></tr>
+              <tr><td>Getting burned bucket, high trade count</td><td>Stop betting here until you understand why</td></tr>
+              <tr><td>Efficient bucket</td><td>Fine to trade here but don't expect to beat the market</td></tr>
+              <tr><td>Any bucket under 8 trades</td><td>Treat as inconclusive — variance is too high</td></tr>
+            </tbody>
+          </table>
+          <h3>The Effective Probability Adjustment</h3>
+          <p>ma.estro calculates your effective probability — the probability that your direction wins — rather than just your raw entry probability. A NO bet at 30% has an effective probability of 70%. This matters for bucketing because a NO at 30% is behaviorally similar to a YES at 70%: you're betting the high-confidence side either way.</p>
+          <div class="wiki-callout">Bucket analysis is most powerful after 100+ resolved trades. Before that, use it directionally. After that, it becomes a genuine decision-making tool for market selection.</div>
+        </div>
+
+        <!-- Position Sizing -->
+        <div class="wiki-article" id="wiki-sizing">
+          <h2>Position Sizing</h2>
+          <p class="wiki-lead">How much you bet matters as much as whether you're right. Flat staking (always betting the same amount) is simple but leaves edge on the table. Kelly Criterion is the mathematically optimal approach but requires accurate probability estimates.</p>
+          <h3>Flat Staking</h3>
+          <p>Bet the same dollar amount on every trade. Simple, easy to track, protects against ruin. The downside: you're not pressing your edge when you have it. Good starting point while building your calibration dataset.</p>
+          <h3>Kelly Criterion</h3>
+          <p>Kelly tells you what fraction of your bankroll to bet given your edge: <code>f = (bp − q) / b</code> where b is the decimal odds, p is your probability of winning, and q is 1 − p.</p>
+          <p>Full Kelly is aggressive and most practitioners use half-Kelly or quarter-Kelly to reduce variance. The formula only works as well as your probability estimates — a miscalibrated input produces a bad bet size.</p>
+          <div class="wiki-callout warn">Don't use Kelly sizing until you have at least 50 resolved trades and a Brier Score under 0.20. Before that, your probability estimates aren't reliable enough to drive sizing decisions.</div>
+          <h3>Practical Approach</h3>
+          <p>A simple middle ground: use two or three stake tiers. Normal conviction gets your base stake. High conviction (buckets where you have demonstrated edge) gets 1.5x. Low conviction or unfamiliar market types get 0.5x. Track which tier performs best over time.</p>
+        </div>
+
+        <!-- Early Exits -->
+        <div class="wiki-article" id="wiki-exits">
+          <h2>Early Exits</h2>
+          <p class="wiki-lead">An early exit means you closed your position before the market resolved — taking profit or cutting a loss rather than waiting for the outcome. Early exits count toward your P&L but are excluded from calibration and Brier Score.</p>
+          <h3>Why They're Excluded from Calibration</h3>
+          <p>Calibration measures whether your probability predictions are accurate. Since early exits don't have a final outcome, there's nothing to score your prediction against. Including them would introduce noise into your accuracy metrics.</p>
+          <h3>When to Exit Early</h3>
+          <table class="wiki-table">
+            <thead><tr><th>SCENARIO</th><th>CONSIDERATION</th></tr></thead>
+            <tbody>
+              <tr><td>Market moved your way sharply</td><td>Lock in profit if you're near max value. Staying in for the last few cents often isn't worth the binary risk.</td></tr>
+              <tr><td>New information changes your view</td><td>Exit immediately. Don't let sunk-cost thinking keep you in a trade your updated model says to leave.</td></tr>
+              <tr><td>Position is underwater</td><td>Exit if your original thesis is broken. Hold if only the price moved but your reasoning still holds.</td></tr>
+              <tr><td>Liquidity is thin near resolution</td><td>Thin markets can gap. Exiting early at a fair price beats getting stuck.</td></tr>
+            </tbody>
+          </table>
+          <div class="wiki-callout">Track your early exit P&L separately from resolved P&L. If your exits are consistently profitable, that's a skill. If they're consistently locking in losses you could have recovered, that's a pattern to fix.</div>
+        </div>
+
+        <!-- Glossary -->
+        <div class="wiki-article" id="wiki-glossary">
+          <h2>Glossary</h2>
+          <p class="wiki-lead">Quick definitions for terms used throughout ma.estro and prediction market trading generally.</p>
+          <table class="wiki-table">
+            <thead><tr><th>TERM</th><th>DEFINITION</th></tr></thead>
+            <tbody>
+              <tr><td>Brier Score</td><td>Average of (predicted prob − actual outcome)² across resolved trades. Lower = better. Target under 0.20.</td></tr>
+              <tr><td>Calibration</td><td>Whether your stated probabilities match your actual win rates. 70% trades should win ~70% of the time.</td></tr>
+              <tr><td>CLV</td><td>Closing Line Value. How much the market moved toward your position after entry. Positive CLV suggests real edge.</td></tr>
+              <tr><td>Effective Probability</td><td>The probability that your direction wins. NO at 30% = effective prob of 70%.</td></tr>
+              <tr><td>Edge</td><td>A systematic advantage where your win rate in a bucket exceeds what the market implied.</td></tr>
+              <tr><td>Kelly Criterion</td><td>Formula for optimal bet sizing based on your edge and odds. Only reliable with well-calibrated probabilities.</td></tr>
+              <tr><td>L20</td><td>Rolling average of your last 20 resolved trades. Shows current form vs. overall historical average.</td></tr>
+              <tr><td>MAPE</td><td>Mean Absolute Percentage Error. Useful for continuous forecasts (like electricity prices) — not for binary markets.</td></tr>
+              <tr><td>Resolution</td><td>When a market officially settles YES or NO. Only resolved trades count toward calibration and Brier Score.</td></tr>
+              <tr><td>Sharpe Ratio</td><td>Risk-adjusted return. Mean return divided by standard deviation of returns. Above 1.0 is good.</td></tr>
+              <tr><td>Stake</td><td>The dollar amount you put into a trade. Not the number of contracts — that depends on entry price.</td></tr>
+              <tr><td>Vigorish (vig)</td><td>The market's built-in edge. Kalshi takes a fee, so raw market prices don't sum to 100%.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div><!-- end wiki-content -->
+    </div><!-- end wiki-layout -->
+  </div>
+
 </div>
 
 <!-- Early Exit Modal -->
@@ -499,6 +719,11 @@ function showPage(name) {
   if (name==='calibration') renderCalibration();
   if (name==='calc') { initCalc(); }
   if (name!=='add') cancelEdit();
+  if (name==='wiki') {
+    document.querySelectorAll('.nav-btn').forEach(function(b){
+      if (b.textContent.trim()==='wiki') b.classList.add('active');
+    });
+  }
 }
 
 function renderAll() {
@@ -1206,6 +1431,14 @@ function calcUpdate() {
   totalEl.textContent = (totalPnl >= 0 ? '+' : '') + '$' + totalPnl.toFixed(2);
   totalEl.style.color = totalPnl >= 0 ? '#10b981' : '#ef4444';
   resultsEl.style.display = 'block';
+}
+
+// ── Wiki ──────────────────────────────────────────────────
+function showWiki(id) {
+  document.querySelectorAll('.wiki-article').forEach(function(a){ a.classList.remove('active'); });
+  document.querySelectorAll('.wiki-nav-item').forEach(function(b){ b.classList.remove('active'); });
+  document.getElementById('wiki-' + id).classList.add('active');
+  event.currentTarget.classList.add('active');
 }
 
 // ── Init ──────────────────────────────────────────────────
