@@ -47,7 +47,7 @@ nav { display: flex; gap: 4px; }
 .btn-danger:hover { background: #ef444415; }
 
 .card { background: #0f1117; border: 1px solid #1e2230; border-radius: 12px; padding: 20px; }
-.stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+.stat-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-bottom: 28px; }
 .stat-card { background: #0f1117; border: 1px solid #1e2230; border-radius: 12px; padding: 20px 24px; }
 .stat-label { color: #4a5568; font-size: 10px; letter-spacing: 0.12em; margin-bottom: 10px; }
 .stat-value { font-weight: 800; font-size: 28px; letter-spacing: -0.02em; font-family: Georgia, serif; }
@@ -155,6 +155,7 @@ select.input-field option { background: #0f1117; }
       <div class="stat-card"><div class="stat-label">TOTAL P&amp;L</div><div class="stat-value" id="stat-pnl">—</div><div class="stat-sub" id="stat-pnl-sub"></div></div>
       <div class="stat-card"><div class="stat-label">TOTAL TRADES</div><div class="stat-value" id="stat-total" style="color:#6366f1">—</div><div class="stat-sub" id="stat-total-sub"></div></div>
       <div class="stat-card"><div class="stat-label">EARLY EXITS</div><div class="stat-value" id="stat-exits" style="color:#f59e0b">—</div><div class="stat-sub" id="stat-exits-sub"></div></div>
+      <div class="stat-card"><div class="stat-label">BRIER SCORE</div><div class="stat-value" id="stat-brier">—</div><div class="stat-sub" id="stat-brier-sub"></div></div>
     </div>
     <div class="card" id="dash-cal-wrap" style="margin-bottom:20px;display:none">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
@@ -333,12 +334,10 @@ select.input-field option { background: #0f1117; }
         <button class="btn btn-ghost" id="calc-mode-exit" onclick="setCalcMode('exit')">Closed Early</button>
       </div>
 
-      <!-- Resolved fields -->
       <div id="calc-resolved-fields">
         <div style="color:#4a5568;font-size:12px;margin-bottom:16px">Each contract pays $1.00 at resolution. Enter how many contracts per lot and what you paid.</div>
       </div>
 
-      <!-- Early exit fields -->
       <div id="calc-exit-fields" style="display:none">
         <div style="color:#4a5568;font-size:12px;margin-bottom:16px">Enter your total proceeds from Robinhood and we'll split it proportionally across your lots.</div>
         <div style="max-width:280px">
@@ -347,7 +346,6 @@ select.input-field option { background: #0f1117; }
         </div>
       </div>
 
-      <!-- Lots -->
       <div style="margin-top:20px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
           <div style="font-family:Georgia,serif;font-weight:700;font-size:14px">Lots</div>
@@ -357,7 +355,6 @@ select.input-field option { background: #0f1117; }
       </div>
     </div>
 
-    <!-- Results -->
     <div class="card" style="max-width:680px" id="calc-results" style="display:none">
       <div style="font-family:Georgia,serif;font-weight:700;font-size:15px;margin-bottom:16px">Results</div>
       <div id="calc-results-body"></div>
@@ -412,7 +409,7 @@ select.input-field option { background: #0f1117; }
 <script>
 // ── Config ────────────────────────────────────────────────
 var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw6fWWLic8wCW8q03N6ozEm04NBlB-JczjVzQtZGEGrOOgpNiRcKliStPHW2VZOrS2S/exec';
-var HEADERS = ['id','market','category','platform','probability','direction','stake','status','exit_price','exit_pnl','actual_pnl','date','notes'];
+var HEADERS = ['id','market','category','platform','probability','direction','stake','status','exit_price','exit_pnl','actual_pnl','date','notes','brier'];
 
 // ── State ─────────────────────────────────────────────────
 var trades = [];
@@ -457,6 +454,7 @@ function loadFromSheet() {
         t.exit_price = t.exit_price !== '' ? Number(t.exit_price) : null;
         t.exit_pnl = t.exit_pnl !== '' ? Number(t.exit_pnl) : null;
         t.actual_pnl = t.actual_pnl !== '' ? Number(t.actual_pnl) : null;
+        t.brier = t.brier !== '' && t.brier !== undefined ? Number(t.brier) : getBrier(t);
         return t;
       });
       renderAll();
@@ -533,6 +531,14 @@ function getOutcome(t) {
 }
 function isWin(t) { return isResolved(t) && t.direction===getOutcome(t); }
 
+// ── Brier Score ───────────────────────────────────────────
+function getBrier(t) {
+  if (t.status !== 'yes' && t.status !== 'no') return null;
+  var p = t.probability / 100;
+  var outcome = t.status === 'yes' ? 1 : 0;
+  return Math.pow(p - outcome, 2);
+}
+
 function getStats() {
   var resolved = trades.filter(isResolved);
   var exits = trades.filter(isExit);
@@ -545,12 +551,22 @@ function getStats() {
   }, 0);
   var exitPnl = exits.reduce(function(acc,t){ return acc+(t.exit_pnl?Number(t.exit_pnl):0); }, 0);
   var totalPnl = resolvedPnl+exitPnl;
+
+  // Brier average across all resolved trades
+  var brierScores = resolved.map(function(t){ return getBrier(t); }).filter(function(b){ return b !== null; });
+  var brierAvg = brierScores.length ? brierScores.reduce(function(a,b){ return a+b; }, 0) / brierScores.length : null;
+
+  // Rolling last 20 resolved trades
+  var last20 = brierScores.slice(-20);
+  var brierRolling = last20.length ? last20.reduce(function(a,b){ return a+b; }, 0) / last20.length : null;
+
   return {
     wins:wins, total:resolved.length,
     winRate: resolved.length?(wins/resolved.length*100).toFixed(1):0,
     pnl: totalPnl.toFixed(2), resolvedPnl:resolvedPnl.toFixed(2),
     exitPnl:exitPnl.toFixed(2), totalStake:totalStake,
-    exitCount:exits.length, exitNet:exitPnl.toFixed(2)
+    exitCount:exits.length, exitNet:exitPnl.toFixed(2),
+    brierAvg: brierAvg, brierRolling: brierRolling, brierCount: brierScores.length
   };
 }
 
@@ -618,8 +634,11 @@ function tradeRowHTML(t) {
       +'<button class="btn-exit" onclick="openExitModal('+t.id+')">EXIT</button>';
   } else {
     var apnl=t.actual_pnl!=null&&t.actual_pnl!==''?(Number(t.actual_pnl)>=0?'+':'')+Number(t.actual_pnl).toFixed(2):null;
+    var brier=getBrier(t);
+    var brierBadge=brier!==null?'<span class="pill" style="background:#6366f120;color:#6366f1">B: '+brier.toFixed(3)+'</span>':'';
     statusBadge='<span class="pill" style="background:'+(win?'#10b98120':'#ef444420')+';color:'+(win?'#10b981':'#ef4444')+'">'+outcome+'</span>'
-      +(apnl?'<span class="pill" style="background:'+(Number(t.actual_pnl)>=0?'#10b98120':'#ef444420')+';color:'+(Number(t.actual_pnl)>=0?'#10b981':'#ef4444')+'"">$'+apnl+'</span>':'');
+      +(apnl?'<span class="pill" style="background:'+(Number(t.actual_pnl)>=0?'#10b98120':'#ef444420')+';color:'+(Number(t.actual_pnl)>=0?'#10b981':'#ef4444')+'"">$'+apnl+'</span>':'')
+      +brierBadge;
   }
   return '<div class="trade-row">'
     +'<div class="trade-dot" style="background:'+dotColor+';'+dotShadow+'"></div>'
@@ -656,6 +675,21 @@ function renderDashboard() {
   var exitNet=Number(s.exitNet);
   document.getElementById('stat-exits-sub').style.color=exitNet>=0?'#10b981':'#ef4444';
   document.getElementById('stat-exits-sub').textContent=s.exitCount?'net '+(exitNet>=0?'+':'')+' $'+s.exitNet:'none yet';
+
+  // Brier stat
+  var brierEl=document.getElementById('stat-brier');
+  var brierSubEl=document.getElementById('stat-brier-sub');
+  if (s.brierAvg !== null) {
+    brierEl.textContent=s.brierAvg.toFixed(3);
+    brierEl.style.color=s.brierAvg<0.15?'#10b981':s.brierAvg<0.20?'#f59e0b':'#ef4444';
+    var rollingStr=s.brierRolling!==null?' · L20: '+s.brierRolling.toFixed(3):'';
+    brierSubEl.textContent=(s.brierAvg<0.15?'good calibration':s.brierAvg<0.20?'room to improve':'needs work')+rollingStr;
+  } else {
+    brierEl.textContent='—';
+    brierEl.style.color='#e2e8f0';
+    brierSubEl.textContent='no resolved trades';
+  }
+
   var calData=getCalibration();
   document.getElementById('dash-cal-wrap').style.display=calData.length?'block':'none';
   if (calData.length) renderLineChart(calData,'dash-chart',200);
@@ -706,10 +740,22 @@ function renderCalibration() {
   var sportCount = resolved.filter(function(t){ return t.category==='Sports'; }).length;
   var eventCount = resolved.filter(function(t){ return t.category==='Current Events'; }).length;
 
+  // Per-category Brier scores
+  function categoryBrier(cat) {
+    var subset = cat === 'All' ? resolved : resolved.filter(function(t){ return t.category === cat; });
+    var scores = subset.map(getBrier).filter(function(b){ return b !== null; });
+    return scores.length ? (scores.reduce(function(a,b){ return a+b; }, 0) / scores.length).toFixed(3) : '—';
+  }
+
   var toggleHTML = '<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">'
     + '<button class="filter-btn cal-cat-btn'+(calCategory==='All'?' active':'')+'" onclick="setCalCategory(\'All\',this)">All ('+resolved.length+')</button>'
     + '<button class="filter-btn cal-cat-btn'+(calCategory==='Sports'?' active':'')+'" onclick="setCalCategory(\'Sports\',this)">Sports ('+sportCount+')</button>'
     + '<button class="filter-btn cal-cat-btn'+(calCategory==='Current Events'?' active':'')+'" onclick="setCalCategory(\'Current Events\',this)">Current Events ('+eventCount+')</button>'
+    + '</div>'
+    + '<div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap">'
+    + '<div class="stat-card" style="flex:1;min-width:140px;padding:14px 18px"><div class="stat-label">BRIER · ALL</div><div style="font-family:Georgia,serif;font-weight:800;font-size:22px;color:'+(categoryBrier('All')==='—'?'#e2e8f0':Number(categoryBrier('All'))<0.15?'#10b981':Number(categoryBrier('All'))<0.20?'#f59e0b':'#ef4444')+'">'+categoryBrier('All')+'</div></div>'
+    + '<div class="stat-card" style="flex:1;min-width:140px;padding:14px 18px"><div class="stat-label">BRIER · SPORTS</div><div style="font-family:Georgia,serif;font-weight:800;font-size:22px;color:'+(categoryBrier('Sports')==='—'?'#e2e8f0':Number(categoryBrier('Sports'))<0.15?'#10b981':Number(categoryBrier('Sports'))<0.20?'#f59e0b':'#ef4444')+'">'+categoryBrier('Sports')+'</div></div>'
+    + '<div class="stat-card" style="flex:1;min-width:140px;padding:14px 18px"><div class="stat-label">BRIER · CURRENT EVENTS</div><div style="font-family:Georgia,serif;font-weight:800;font-size:22px;color:'+(categoryBrier('Current Events')==='—'?'#e2e8f0':Number(categoryBrier('Current Events'))<0.15?'#10b981':Number(categoryBrier('Current Events'))<0.20?'#f59e0b':'#ef4444')+'">'+categoryBrier('Current Events')+'</div></div>'
     + '</div>';
 
   if (!data.length){
@@ -790,6 +836,7 @@ function submitTrade() {
     status:status,exit_price:exitPrice,exit_pnl:exitPnl,actual_pnl:actualPnl,
     notes:document.getElementById('f-notes').value.trim()
   };
+  t.brier = getBrier(t);
   if (editId){ trades=trades.map(function(x){ return x.id===editId?t:x; }); showToast('Trade updated'); }
   else { trades.push(t); showToast('Trade added'); }
   saveAllToSheet();
@@ -841,7 +888,12 @@ function cancelEdit() {
 }
 
 function resolveTrade(id, status) {
-  trades=trades.map(function(t){ return t.id==id?Object.assign({},t,{status:status}):t; });
+  trades=trades.map(function(t){
+    if (t.id!=id) return t;
+    var updated = Object.assign({},t,{status:status});
+    updated.brier = getBrier(updated);
+    return updated;
+  });
   saveAllToSheet(); showToast('Resolved '+status.toUpperCase());
   var active=document.querySelector('.page.active').id.replace('page-','');
   if (active==='dashboard') renderDashboard();
@@ -875,7 +927,7 @@ function confirmExit() {
   if (!pnl){ alert('Enter your actual P&L'); return; }
   trades=trades.map(function(t){
     if (t.id!=exitTargetId) return t;
-    return Object.assign({},t,{status:'exit',exit_price:price?Number(price):null,exit_pnl:Number(pnl)});
+    return Object.assign({},t,{status:'exit',exit_price:price?Number(price):null,exit_pnl:Number(pnl),brier:null});
   });
   saveAllToSheet(); showToast('Closed early — P&L recorded');
   closeExitModal();
@@ -888,9 +940,10 @@ document.getElementById('exit-modal').addEventListener('click',function(e){ if(e
 
 // ── CSV ───────────────────────────────────────────────────
 function exportCSV() {
-  var headers='market,category,platform,probability,direction,stake,status,exit_price,exit_pnl,actual_pnl,date,notes';
+  var headers='market,category,platform,probability,direction,stake,status,exit_price,exit_pnl,actual_pnl,date,notes,brier';
   var rows=trades.map(function(t){
-    return [t.market,t.category,t.platform||'Kalshi',t.probability,t.direction,t.stake,t.status||'open',t.exit_price||'',t.exit_pnl||'',t.actual_pnl!=null?t.actual_pnl:'',t.date,t.notes||''].join(',');
+    var brier=getBrier(t);
+    return [t.market,t.category,t.platform||'Kalshi',t.probability,t.direction,t.stake,t.status||'open',t.exit_price||'',t.exit_pnl||'',t.actual_pnl!=null?t.actual_pnl:'',t.date,t.notes||'',brier!=null?brier.toFixed(4):''].join(',');
   });
   var blob=new Blob([headers+'\n'+rows.join('\n')],{type:'text/csv'});
   var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='edge-trades.csv'; a.click();
@@ -906,7 +959,7 @@ function importCSV(e) {
     var newTrades=lines.slice(1).filter(function(l){return l.trim();}).map(function(line,i){
       var vals=line.split(',').map(function(v){return v.trim();}),obj={};
       headers.forEach(function(h,idx){obj[h]=vals[idx];});
-      return {
+      var t = {
         id:Date.now()+i,market:obj.market||'',category:obj.category||'Sports',
         platform:obj.platform||'Kalshi',probability:Number(obj.probability)||50,
         direction:obj.direction||'YES',stake:Number(obj.stake)||10,
@@ -916,6 +969,8 @@ function importCSV(e) {
         actual_pnl:obj.actual_pnl!==undefined&&obj.actual_pnl!==''?Number(obj.actual_pnl):null,
         date:obj.date||new Date().toISOString().slice(0,10),notes:obj.notes||''
       };
+      t.brier = getBrier(t);
+      return t;
     });
     trades=trades.concat(newTrades);
     saveAllToSheet(); showToast('Imported '+newTrades.length+' trades'); renderTrades();
@@ -1002,10 +1057,15 @@ function openBucketModal(bucketLabel) {
   var expected = (bucket.min+bucket.max)/2;
   var diff = actualRate - expected;
 
+  // Bucket-level Brier
+  var bucketBrierScores = inBucket.map(getBrier).filter(function(b){ return b !== null; });
+  var bucketBrier = bucketBrierScores.length ? (bucketBrierScores.reduce(function(a,b){ return a+b; },0)/bucketBrierScores.length).toFixed(3) : null;
+
   document.getElementById('bucket-modal-title').textContent = bucketLabel + ' bucket';
   document.getElementById('bucket-modal-sub').textContent =
     wins + ' wins of ' + inBucket.length + ' trades · ' + actualRate + '% actual vs ' + expected + '% expected · ' +
-    (diff >= 0 ? '+' : '') + diff.toFixed(1) + '% ' + (diff >= 0 ? 'edge' : 'bleed');
+    (diff >= 0 ? '+' : '') + diff.toFixed(1) + '% ' + (diff >= 0 ? 'edge' : 'bleed') +
+    (bucketBrier ? ' · Brier: ' + bucketBrier : '');
 
   var html = inBucket.map(function(t){
     var win = isWin(t);
@@ -1013,6 +1073,7 @@ function openBucketModal(bucketLabel) {
     var pnl = t.actual_pnl != null && t.actual_pnl !== '' ? Number(t.actual_pnl) :
       (win ? Number(t.stake)*(1/( t.probability/100)-1) : -Number(t.stake));
     var pnlStr = (pnl >= 0 ? '+' : '') + '$' + pnl.toFixed(2);
+    var brier = getBrier(t);
     return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #1e2230">'
       + '<div style="width:6px;height:6px;border-radius:50%;background:'+(win?'#10b981':'#ef4444')+';flex-shrink:0"></div>'
       + '<div style="flex:1;min-width:0">'
@@ -1024,6 +1085,7 @@ function openBucketModal(bucketLabel) {
         + '<div style="font-size:12px;color:'+(win?'#10b981':'#ef4444')+';margin-top:2px">'
           + '<span style="background:'+(win?'#10b98120':'#ef444420')+';padding:1px 8px;border-radius:10px">'+(win?'WIN':'LOSS')+'</span>'
           + ' ' + pnlStr
+          + (brier !== null ? ' <span style="color:#6366f1;font-size:11px">B:'+brier.toFixed(3)+'</span>' : '')
         + '</div>'
       + '</div>'
     + '</div>';
@@ -1036,6 +1098,8 @@ function openBucketModal(bucketLabel) {
 function closeBucketModal() {
   document.getElementById('bucket-modal').classList.remove('show');
 }
+
+// ── Calculator ────────────────────────────────────────────
 var calcMode = 'resolved';
 var calcLots = [];
 
@@ -1102,7 +1166,6 @@ function calcUpdate() {
 
   var results;
   if (calcMode === 'resolved') {
-    // Each contract pays $1 at resolution
     results = lots.map(function(l, i) {
       var proceeds = l.contracts * 1.00;
       var pnl = proceeds - l.cost;
