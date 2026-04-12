@@ -73,7 +73,8 @@ nav { display: flex; gap: 4px; }
 .input-field:focus { border-color: #10b981; }
 select.input-field option { background: #0f1117; }
 
-.filter-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.btn-push { background: #6366f120; color: #6366f1; border: none; cursor: pointer; border-radius: 6px; padding: 5px 10px; font-size: 11px; font-family: inherit; }
+.btn-push:hover { background: #6366f135; }
 .filter-btn { background: none; border: 1px solid #2a2d3a; color: #8b9ab0; cursor: pointer; padding: 5px 14px; border-radius: 20px; font-family: inherit; font-size: 12px; transition: all 0.15s; }
 .filter-btn:hover { border-color: #4a5568; color: #e2e8f0; }
 .filter-btn.active { border-color: #10b981; color: #10b981; background: #10b98110; }
@@ -232,7 +233,7 @@ select.input-field option { background: #0f1117; }
   <div class="page" id="page-calibration">
     <div style="margin-bottom:28px">
       <div class="section-title">Calibration Analysis</div>
-      <div class="section-sub">Held-to-resolution trades only — early exits excluded</div>
+      <div class="section-sub">Held-to-resolution trades only — early exits and pushes excluded</div>
     </div>
     <div id="cal-content"></div>
   </div>
@@ -301,6 +302,7 @@ select.input-field option { background: #0f1117; }
           <option value="open">Open — still active</option>
           <option value="yes">Resolved YES</option>
           <option value="no">Resolved NO</option>
+          <option value="push">Push — void/tie</option>
           <option value="exit">Closed Early</option>
         </select>
       </div>
@@ -573,6 +575,7 @@ select.input-field option { background: #0f1117; }
               <tr><td>Kelly Criterion</td><td>Formula for optimal bet sizing based on your edge and odds. Only reliable with well-calibrated probabilities.</td></tr>
               <tr><td>L20</td><td>Rolling average of your last 20 resolved trades. Shows current form vs. overall historical average.</td></tr>
               <tr><td>MAPE</td><td>Mean Absolute Percentage Error. Useful for continuous forecasts (like electricity prices) — not for binary markets.</td></tr>
+              <tr><td>Push</td><td>A void or tie outcome. Stake is returned, P&L is $0. Excluded from calibration and Brier Score since there is no binary outcome to score.</td></tr>
               <tr><td>Resolution</td><td>When a market officially settles YES or NO. Only resolved trades count toward calibration and Brier Score.</td></tr>
               <tr><td>Sharpe Ratio</td><td>Risk-adjusted return. Mean return divided by standard deviation of returns. Above 1.0 is good.</td></tr>
               <tr><td>Stake</td><td>The dollar amount you put into a trade. Not the number of contracts — that depends on entry price.</td></tr>
@@ -747,6 +750,7 @@ var BUCKETS = [
 // ── Helpers ───────────────────────────────────────────────
 function isOpen(t) { return t.status==='open' || (!t.status && !t.resolved); }
 function isExit(t) { return t.status==='exit'; }
+function isPush(t) { return t.status==='push'; }
 function isResolved(t) { return t.status==='yes'||t.status==='no'||(t.status===undefined&&t.resolved); }
 function getOutcome(t) {
   if (t.status==='yes') return 'YES';
@@ -767,6 +771,7 @@ function getBrier(t) {
 function getStats() {
   var resolved = trades.filter(isResolved);
   var exits = trades.filter(isExit);
+  var pushes = trades.filter(isPush);
   var wins = resolved.filter(isWin).length;
   var totalStake = resolved.reduce(function(a,t){ return a+Number(t.stake); }, 0);
   var resolvedPnl = resolved.reduce(function(acc,t){
@@ -791,7 +796,8 @@ function getStats() {
     pnl: totalPnl.toFixed(2), resolvedPnl:resolvedPnl.toFixed(2),
     exitPnl:exitPnl.toFixed(2), totalStake:totalStake,
     exitCount:exits.length, exitNet:exitPnl.toFixed(2),
-    brierAvg: brierAvg, brierRolling: brierRolling, brierCount: brierScores.length
+    brierAvg: brierAvg, brierRolling: brierRolling, brierCount: brierScores.length,
+    pushCount: pushes.length
   };
 }
 
@@ -844,11 +850,14 @@ function renderLineChart(data, containerId, h) {
 
 // ── Trade row ─────────────────────────────────────────────
 function tradeRowHTML(t) {
-  var exit=isExit(t),open=isOpen(t),win=isWin(t),outcome=getOutcome(t);
-  var dotColor=open?'#f59e0b':exit?'#f59e0b':(win?'#10b981':'#ef4444');
+  var exit=isExit(t),open=isOpen(t),push=isPush(t),win=isWin(t),outcome=getOutcome(t);
+  var dotColor=open?'#f59e0b':exit?'#f59e0b':push?'#6366f1':(win?'#10b981':'#ef4444');
   var dotShadow=open?'box-shadow:0 0 6px #f59e0b80':'';
   var statusBadge='';
-  if (exit) {
+  if (push) {
+    statusBadge='<span class="pill" style="background:#6366f120;color:#6366f1">PUSH</span>'
+      +'<span class="pill" style="background:#4a556820;color:#4a5568">$0.00</span>';
+  } else if (exit) {
     var ep=t.exit_price?t.exit_price+'%':'?';
     var epnl=t.exit_pnl!=null?(Number(t.exit_pnl)>=0?'+':'')+Number(t.exit_pnl).toFixed(2):'?';
     statusBadge='<span class="pill" style="background:#f59e0b20;color:#f59e0b">EXIT '+ep+'</span>'
@@ -856,6 +865,7 @@ function tradeRowHTML(t) {
   } else if (open) {
     statusBadge='<button class="btn-yes" onclick="resolveTrade('+t.id+',\'yes\')">YES</button>'
       +'<button class="btn-no" onclick="resolveTrade('+t.id+',\'no\')">NO</button>'
+      +'<button class="btn-push" onclick="resolveTrade('+t.id+',\'push\')">PUSH</button>'
       +'<button class="btn-exit" onclick="openExitModal('+t.id+')">EXIT</button>';
   } else {
     var apnl=t.actual_pnl!=null&&t.actual_pnl!==''?(Number(t.actual_pnl)>=0?'+':'')+Number(t.actual_pnl).toFixed(2):null;
@@ -887,7 +897,7 @@ function tradeRowHTML(t) {
 function renderDashboard() {
   var s=getStats(),hasData=trades.length>0;
   document.getElementById('dash-empty').style.display=hasData?'none':'block';
-  document.getElementById('dash-sub').textContent=hasData?s.total+' resolved · '+trades.filter(isOpen).length+' open · '+s.exitCount+' early exits':'';
+  document.getElementById('dash-sub').textContent=hasData?s.total+' resolved · '+trades.filter(isOpen).length+' open · '+s.exitCount+' early exits'+(s.pushCount?' · '+s.pushCount+' push':''):'';
   document.getElementById('stat-winrate').textContent=s.total?s.winRate+'%':'—';
   document.getElementById('stat-winrate-sub').textContent=s.total?s.wins+' of '+s.total+' resolved':'no resolved trades';
   var pnlEl=document.getElementById('stat-pnl');
@@ -928,7 +938,7 @@ function renderTrades() {
   else if (currentFilter==='Open') filtered=trades.filter(isOpen);
   else if (currentFilter==='Exits') filtered=trades.filter(isExit);
   else filtered=trades.filter(function(t){ return t.category===currentFilter; });
-  document.getElementById('trades-count').textContent=trades.length+' total · '+trades.filter(isExit).length+' early exits';
+  document.getElementById('trades-count').textContent=trades.length+' total · '+trades.filter(isExit).length+' early exits · '+trades.filter(isPush).length+' pushes';
   var list=document.getElementById('trades-list');
   if (!filtered.length){ list.innerHTML='<div style="padding:40px;text-align:center;color:#4a5568">No trades in this view yet</div>'; return; }
   var sorted=filtered.slice().sort(function(a,b){
@@ -1061,7 +1071,7 @@ function submitTrade() {
     status:status,exit_price:exitPrice,exit_pnl:exitPnl,actual_pnl:actualPnl,
     notes:document.getElementById('f-notes').value.trim()
   };
-  t.brier = getBrier(t);
+  t.brier = status==='push' ? null : getBrier(t);
   if (editId){ trades=trades.map(function(x){ return x.id===editId?t:x; }); showToast('Trade updated'); }
   else { trades.push(t); showToast('Trade added'); }
   saveAllToSheet();
@@ -1116,10 +1126,10 @@ function resolveTrade(id, status) {
   trades=trades.map(function(t){
     if (t.id!=id) return t;
     var updated = Object.assign({},t,{status:status});
-    updated.brier = getBrier(updated);
+    updated.brier = status==='push' ? null : getBrier(updated);
     return updated;
   });
-  saveAllToSheet(); showToast('Resolved '+status.toUpperCase());
+  saveAllToSheet(); showToast('Resolved '+(status==='push'?'PUSH':status.toUpperCase()));
   var active=document.querySelector('.page.active').id.replace('page-','');
   if (active==='dashboard') renderDashboard();
   if (active==='trades') renderTrades();
