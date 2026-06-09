@@ -805,7 +805,12 @@ function loadFromSheet() {
     .then(function(r){ return r.json(); })
     .then(function(data) {
       var rows = data.values || [];
-      if (rows.length > 1) {
+      // Safety check — if first row doesn't look like parlay headers, ignore it
+      var firstRow = rows[0] || [];
+      var isValidParlaySheet = firstRow.length > 0 && String(firstRow[0]).toLowerCase().trim() === 'id' && firstRow.some(function(h){ return String(h).toLowerCase().trim() === 'legs'; });
+      if (!isValidParlaySheet || rows.length <= 1) {
+        parlays = [];
+      } else {
         var headers = rows[0].map(function(h){ return String(h).trim().toLowerCase(); });
         parlays = rows.slice(1).filter(function(r){ return r[0]; }).map(function(r) {
           var p = {};
