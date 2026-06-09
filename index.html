@@ -866,7 +866,15 @@ function saveParlaysToSheet() {
   fetch(SCRIPT_URL, {
     method: 'POST',
     body: JSON.stringify({ action: 'write', sheet: 'parlays', values: values })
-  }).catch(function(e){ console.error('Parlay save failed', e); });
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    if (!data.success) showToast('Parlay save failed', 'red');
+  })
+  .catch(function(e){
+    console.error('Parlay save failed:', e);
+    showToast('Parlay save failed — check Apps Script deployment', 'red');
+  });
 }
 
 // ── Nav ───────────────────────────────────────────────────
@@ -946,7 +954,16 @@ function getStats() {
     return isWin(t)?acc+s*(1/p-1):acc-s;
   }, 0);
   var exitPnl = exits.reduce(function(acc,t){ return acc+(t.exit_pnl?Number(t.exit_pnl):0); }, 0);
-  var totalPnl = resolvedPnl+exitPnl;
+
+  // Parlay P&L — resolved parlays only
+  var parlayPnl = parlays.reduce(function(acc,p){
+    if (p.status !== 'yes' && p.status !== 'no') return acc;
+    var payout = (!isNaN(parseFloat(p.payout)) && p.payout !== null) ? parseFloat(p.payout) : 0;
+    var stake = parseFloat(p.stake) || 0;
+    return acc + (payout - stake);
+  }, 0);
+
+  var totalPnl = resolvedPnl + exitPnl + parlayPnl;
 
   // Brier average across all resolved trades
   var brierScores = resolved.map(function(t){ return getBrier(t); }).filter(function(b){ return b !== null; });
@@ -960,7 +977,7 @@ function getStats() {
     wins:wins, total:resolved.length,
     winRate: resolved.length?(wins/resolved.length*100).toFixed(1):0,
     pnl: totalPnl.toFixed(2), resolvedPnl:resolvedPnl.toFixed(2),
-    exitPnl:exitPnl.toFixed(2), totalStake:totalStake,
+    exitPnl:exitPnl.toFixed(2), parlayPnl:parlayPnl.toFixed(2), totalStake:totalStake,
     exitCount:exits.length, exitNet:exitPnl.toFixed(2),
     brierAvg: brierAvg, brierRolling: brierRolling, brierCount: brierScores.length,
     pushCount: pushes.length
@@ -1069,7 +1086,7 @@ function renderDashboard() {
   var pnlEl=document.getElementById('stat-pnl');
   pnlEl.textContent=(trades.length&&(s.total||s.exitCount))?(Number(s.pnl)>=0?'+':'')+' $'+s.pnl:'—';
   pnlEl.style.color=Number(s.pnl)>=0?'#10b981':'#ef4444';
-  document.getElementById('stat-pnl-sub').textContent=s.exitCount?'incl. $'+s.exitPnl+' from exits':'from resolved trades';
+  document.getElementById('stat-pnl-sub').textContent = (s.exitCount&&Number(s.parlayPnl)!==0) ? 'incl. exits + parlays' : s.exitCount ? 'incl. $'+s.exitPnl+' from exits' : Number(s.parlayPnl)!==0 ? 'incl. $'+s.parlayPnl+' from parlays' : 'from resolved trades';
   document.getElementById('stat-total').textContent=trades.length;
   document.getElementById('stat-total-sub').textContent=trades.filter(isOpen).length+' still open';
   document.getElementById('stat-exits').textContent=s.exitCount;
