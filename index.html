@@ -170,7 +170,6 @@ select.input-field option { background: #0f1117; }
         <button class="nav-btn" onclick="showPage('trades')">trades</button>
         <button class="nav-btn" onclick="showPage('calibration')">calibration</button>
         <button class="nav-btn" id="add-nav-btn" onclick="showPage('add')">+ add</button>
-        <button class="nav-btn" onclick="showPage('parlays')">parlays</button>
         <button class="nav-btn" onclick="showPage('calc')">⊕ calc</button>
         <button class="nav-btn" onclick="showPage('wiki')">wiki</button>
       </nav>
@@ -783,57 +782,20 @@ function loadFromSheet() {
     .then(function(r){ return r.json(); })
     .then(function(data) {
       var rows = data.values || [];
-      if (rows.length <= 1) { trades = []; renderAll(); setSyncStatus('', 'Synced'); }
-      else {
-        var headers = rows[0];
-        trades = rows.slice(1).filter(function(r){ return r[0]; }).map(function(r) {
-          var t = {};
-          headers.forEach(function(h, i){ t[h] = r[i] !== undefined ? r[i] : ''; });
-          t.probability = Number(t.probability) || 0;
-          t.stake = Number(t.stake) || 0;
-          t.id = Number(t.id) || Date.now();
-          t.exit_price = t.exit_price !== '' ? Number(t.exit_price) : null;
-          t.exit_pnl = t.exit_pnl !== '' ? Number(t.exit_pnl) : null;
-          t.actual_pnl = t.actual_pnl !== '' ? Number(t.actual_pnl) : null;
-          t.brier = t.brier !== '' && t.brier !== undefined ? Number(t.brier) : getBrier(t);
-          return t;
-        });
-      }
-      // Load parlays sheet
-      return fetch(SCRIPT_URL + '?sheet=parlays');
-    })
-    .then(function(r){ return r.json(); })
-    .then(function(data) {
-      var rows = data.values || [];
-      // Safety check — if first row doesn't look like parlay headers, ignore it
-      var firstRow = rows[0] || [];
-      var isValidParlaySheet = firstRow.length > 0 && String(firstRow[0]).toLowerCase().trim() === 'id' && firstRow.some(function(h){ return String(h).toLowerCase().trim() === 'legs'; });
-      if (!isValidParlaySheet || rows.length <= 1) {
-        parlays = [];
-      } else {
-        var headers = rows[0].map(function(h){ return String(h).trim().toLowerCase(); });
-        parlays = rows.slice(1).filter(function(r){ return r[0]; }).map(function(r) {
-          var p = {};
-          headers.forEach(function(h, i){ p[h] = r[i] !== undefined ? String(r[i]) : ''; });
-          p.id = Number(p.id) || Date.now();
-          p.name = p.name || '';
-          p.stake = parseFloat(p.stake) || 0;
-          p.payout = (p.payout !== '' && p.payout !== null && !isNaN(parseFloat(p.payout))) ? parseFloat(p.payout) : null;
-          p.status = p.status || 'open';
-          // Trim ISO timestamp from date
-          p.date = p.date ? p.date.replace('T',' ').split('T')[0].split(' ')[0] : '';
-          // Parse legs JSON
-          try {
-            var legsRaw = p.legs;
-            if (typeof legsRaw === 'string' && legsRaw.trim().startsWith('[')) {
-              p.legs = JSON.parse(legsRaw);
-            } else {
-              p.legs = [];
-            }
-          } catch(e) { p.legs = []; }
-          return p;
-        });
-      }
+      if (rows.length <= 1) { trades = []; renderAll(); setSyncStatus('', 'Synced'); return; }
+      var headers = rows[0];
+      trades = rows.slice(1).filter(function(r){ return r[0]; }).map(function(r) {
+        var t = {};
+        headers.forEach(function(h, i){ t[h] = r[i] !== undefined ? r[i] : ''; });
+        t.probability = Number(t.probability) || 0;
+        t.stake = Number(t.stake) || 0;
+        t.id = Number(t.id) || Date.now();
+        t.exit_price = t.exit_price !== '' ? Number(t.exit_price) : null;
+        t.exit_pnl = t.exit_pnl !== '' ? Number(t.exit_pnl) : null;
+        t.actual_pnl = t.actual_pnl !== '' ? Number(t.actual_pnl) : null;
+        t.brier = t.brier !== '' && t.brier !== undefined ? Number(t.brier) : getBrier(t);
+        return t;
+      });
       renderAll();
       setSyncStatus('', 'Synced · ' + trades.length + ' trades');
     })
@@ -892,7 +854,6 @@ function showPage(name) {
   if (name==='dashboard') renderDashboard();
   if (name==='trades') renderTrades();
   if (name==='calibration') renderCalibration();
-  if (name==='parlays') renderParlays();
   if (name==='calc') { initCalc(); }
   if (name!=='add') cancelEdit();
   if (name==='wiki') {
@@ -906,9 +867,8 @@ function renderAll() {
   var active = document.querySelector('.page.active');
   var name = active ? active.id.replace('page-','') : 'dashboard';
   if (name==='dashboard') renderDashboard();
-  if (name==='trades') renderTrades();
-  if (name==='calibration') renderCalibration();
-  if (name==='parlays') renderParlays();
+  else if (name==='trades') renderTrades();
+  else if (name==='calibration') renderCalibration();
   else renderDashboard();
 }
 
@@ -954,16 +914,7 @@ function getStats() {
     return isWin(t)?acc+s*(1/p-1):acc-s;
   }, 0);
   var exitPnl = exits.reduce(function(acc,t){ return acc+(t.exit_pnl?Number(t.exit_pnl):0); }, 0);
-
-  // Parlay P&L — resolved parlays only
-  var parlayPnl = parlays.reduce(function(acc,p){
-    if (p.status !== 'yes' && p.status !== 'no') return acc;
-    var payout = (!isNaN(parseFloat(p.payout)) && p.payout !== null) ? parseFloat(p.payout) : 0;
-    var stake = parseFloat(p.stake) || 0;
-    return acc + (payout - stake);
-  }, 0);
-
-  var totalPnl = resolvedPnl + exitPnl + parlayPnl;
+  var totalPnl = resolvedPnl + exitPnl;
 
   // Brier average across all resolved trades
   var brierScores = resolved.map(function(t){ return getBrier(t); }).filter(function(b){ return b !== null; });
@@ -977,7 +928,7 @@ function getStats() {
     wins:wins, total:resolved.length,
     winRate: resolved.length?(wins/resolved.length*100).toFixed(1):0,
     pnl: totalPnl.toFixed(2), resolvedPnl:resolvedPnl.toFixed(2),
-    exitPnl:exitPnl.toFixed(2), parlayPnl:parlayPnl.toFixed(2), totalStake:totalStake,
+    exitPnl:exitPnl.toFixed(2), totalStake:totalStake,
     exitCount:exits.length, exitNet:exitPnl.toFixed(2),
     brierAvg: brierAvg, brierRolling: brierRolling, brierCount: brierScores.length,
     pushCount: pushes.length
@@ -1086,7 +1037,7 @@ function renderDashboard() {
   var pnlEl=document.getElementById('stat-pnl');
   pnlEl.textContent=(trades.length&&(s.total||s.exitCount))?(Number(s.pnl)>=0?'+':'')+' $'+s.pnl:'—';
   pnlEl.style.color=Number(s.pnl)>=0?'#10b981':'#ef4444';
-  document.getElementById('stat-pnl-sub').textContent = (s.exitCount&&Number(s.parlayPnl)!==0) ? 'incl. exits + parlays' : s.exitCount ? 'incl. $'+s.exitPnl+' from exits' : Number(s.parlayPnl)!==0 ? 'incl. $'+s.parlayPnl+' from parlays' : 'from resolved trades';
+  document.getElementById('stat-pnl-sub').textContent=s.exitCount?'incl. $'+s.exitPnl+' from exits':'from resolved trades';
   document.getElementById('stat-total').textContent=trades.length;
   document.getElementById('stat-total-sub').textContent=trades.filter(isOpen).length+' still open';
   document.getElementById('stat-exits').textContent=s.exitCount;
@@ -1720,30 +1671,32 @@ function submitParlay() {
   var name = document.getElementById('p-name').value.trim();
   var stake = Number(document.getElementById('p-stake').value);
   var status = document.getElementById('p-status').value;
-  var payout = document.getElementById('p-payout').value;
+  var payoutRaw = document.getElementById('p-payout').value;
+  var totalPayout = payoutRaw !== '' ? Number(payoutRaw) : null;
   var date = document.getElementById('p-date').value;
   if (!name) { showToast('Enter a parlay name'); return; }
   if (!stake) { showToast('Enter a stake'); return; }
-  if (parlayLegs.length < 2) { showToast('Add at least 2 legs'); return; }
   var validLegs = parlayLegs.filter(function(l){ return l.market && l.probability; });
-  if (validLegs.length < 2) { showToast('Fill in market and probability for each leg'); return; }
+  if (validLegs.length < 2) { showToast('Fill in market and probability for at least 2 legs'); return; }
 
-  var parlayId = 'P-' + Date.now();
-  var p = {
-    id: Date.now(),
-    name: name,
-    legs: validLegs,
-    stake: stake,
-    status: status,
-    payout: payout !== '' ? Number(payout) : null,
-    date: date,
-    notes: document.getElementById('p-notes').value.trim()
-  };
-  parlays.push(p);
+  // Split stake proportionally by probability weight (equal split for simplicity)
+  var stakePerLeg = stake / validLegs.length;
 
-  // Also add each leg as an individual trade linked by parlay_id
-  var pnlPerLeg = 0; // legs show $0 P&L individually — parlay handles it
+  // Split payout proportionally across legs if resolved
+  var resolvedStatus = (status === 'yes' || status === 'no' || status === 'push');
+
   validLegs.forEach(function(leg, i) {
+    // Proportional actual P&L per leg
+    var legPnl = null;
+    if (resolvedStatus && totalPayout !== null) {
+      var legShare = totalPayout / validLegs.length;
+      legPnl = legShare - stakePerLeg;
+    } else if (resolvedStatus && status === 'no') {
+      legPnl = -stakePerLeg;
+    } else if (resolvedStatus && status === 'push') {
+      legPnl = 0;
+    }
+
     var t = {
       id: Date.now() + i + 1,
       market: leg.market,
@@ -1751,37 +1704,29 @@ function submitParlay() {
       platform: 'Kalshi',
       direction: leg.direction,
       probability: Number(leg.probability),
-      stake: 0, // no individual stake — parlay-level only
+      stake: parseFloat(stakePerLeg.toFixed(2)),
       status: status === 'yes' ? 'yes' : status === 'no' ? 'no' : status === 'push' ? 'push' : 'open',
       exit_price: null,
       exit_pnl: null,
-      actual_pnl: 0, // P&L tracked at parlay level
+      actual_pnl: legPnl !== null ? parseFloat(legPnl.toFixed(2)) : null,
       date: date,
-      notes: 'Parlay leg · ' + name,
-      parlay_id: parlayId
+      notes: 'Parlay: ' + name + (validLegs.length > 1 ? ' (leg '+(i+1)+'/'+validLegs.length+')' : '')
     };
     t.brier = getBrier(t);
     trades.push(t);
   });
 
-  saveParlaysToSheet();
   saveAllToSheet();
-  showToast('Parlay added · ' + validLegs.length + ' legs logged to trades');
+  showToast('Parlay added · ' + validLegs.length + ' legs logged');
   parlayLegs = [];
   cancelEdit();
-  showPage('parlays');
+  showPage('trades');
 }
 
 function deleteParlay(id) {
-  if (!confirm('Delete this parlay and its legs from trades?')) return;
-  var parlay = parlays.find(function(p){ return p.id == id; });
+  if (!confirm('Delete this parlay?')) return;
   parlays = parlays.filter(function(p){ return p.id != id; });
-  // Remove associated trade legs
-  if (parlay) {
-    trades = trades.filter(function(t){ return !(t.notes && t.notes.indexOf('Parlay leg · ' + parlay.name) === 0); });
-  }
   saveParlaysToSheet();
-  saveAllToSheet();
   showToast('Parlay deleted');
   renderParlays();
 }
@@ -1866,21 +1811,21 @@ function renderParlays() {
       + '</div>';
     }).join('') : '<div style="font-size:11px;color:#4a5568;padding:4px 0">No leg data</div>';
 
-    return '<div style="padding:14px 20px;border-bottom:1px solid #1e2230">'
-      + '<div style="display:flex;align-items:flex-start;gap:12px">'
-        + '<div style="width:6px;height:6px;border-radius:50%;background:'+dotColor+';flex-shrink:0;margin-top:6px'+(isOpen?';box-shadow:0 0 6px #f59e0b80':'')+'"</div>'
-        + '<div style="flex:1;min-width:0">'
-          + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">'
-            + '<div style="min-width:0">'
-              + '<div style="font-size:14px;color:#e2e8f0;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:400px">'+displayName+'</div>'
-              + '<div style="font-size:11px;color:#4a5568;margin-top:2px">'+displayDate+' · '+legs.length+' legs · $'+stake.toFixed(2)+' stake · '+(combinedProb*100).toFixed(1)+'% combined</div>'
+    return '<div style="padding:16px 20px;border-bottom:1px solid #1e2230;overflow:hidden">'
+      + '<div style="display:flex;align-items:flex-start;gap:10px">'
+        + '<div style="width:6px;height:6px;border-radius:50%;background:'+dotColor+';flex-shrink:0;margin-top:5px'+(isOpen?';box-shadow:0 0 6px #f59e0b80':'')+'"</div>'
+        + '<div style="flex:1;min-width:0;overflow:hidden">'
+          + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">'
+            + '<div style="min-width:0;flex:1">'
+              + '<div style="font-size:13px;color:#e2e8f0;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+displayName+'</div>'
+              + '<div style="font-size:11px;color:#4a5568;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+displayDate+' · '+legs.length+' legs · $'+stake.toFixed(2)+' stake · '+(combinedProb*100).toFixed(1)+'% combined</div>'
             + '</div>'
-            + '<div style="display:flex;gap:6px;align-items:center;flex-shrink:0">'
+            + '<div style="display:flex;gap:6px;align-items:center;flex-shrink:0;margin-left:8px">'
               + statusBadge
               + '<button class="btn-danger" onclick="deleteParlay('+p.id+')">✕</button>'
             + '</div>'
           + '</div>'
-          + '<div style="padding:8px 12px;background:#080b1280;border-radius:6px;margin-top:10px">' + legsHtml + '</div>'
+          + '<div style="margin-top:10px;padding:8px 10px;background:#0d1018;border-radius:6px;border:1px solid #1e2230">' + legsHtml + '</div>'
           + (p.notes && p.notes !== 'undefined' ? '<div style="font-size:11px;color:#4a5568;margin-top:6px">'+p.notes+'</div>' : '')
         + '</div>'
       + '</div>'
