@@ -112,6 +112,15 @@ select.input-field option { background: #0f1117; }
 .cal-date.selected { background: #10b981; color: #080b12; font-weight: 700; }
 .cal-date.other-month { color: #2a2d3a; }
 
+/* Parlay */
+.parlay-toggle { display:flex; align-items:center; gap:10px; padding:12px 16px; background:#6366f110; border:1px solid #6366f130; border-radius:8px; cursor:pointer; margin-bottom:4px; }
+.parlay-toggle input[type=checkbox] { width:16px; height:16px; accent-color:#6366f1; cursor:pointer; }
+.parlay-leg { background:#080b12; border:1px solid #2a2d3a; border-radius:8px; padding:14px; margin-bottom:10px; position:relative; }
+.parlay-leg-num { color:#6366f1; font-size:10px; letter-spacing:0.1em; margin-bottom:10px; }
+.parlay-combined { background:#6366f110; border:1px solid #6366f130; border-radius:8px; padding:12px 16px; margin:12px 0; font-size:13px; }
+.parlay-row { display:flex; align-items:center; gap:12px; padding:10px 20px; border-bottom:1px solid #1e2230; }
+.parlay-row:last-child { border-bottom:none; }
+
 /* Wiki */
 .wiki-layout { display: grid; grid-template-columns: 220px 1fr; gap: 32px; align-items: start; }
 .wiki-nav { position: sticky; top: 92px; background: #0f1117; border: 1px solid #1e2230; border-radius: 12px; padding: 16px 0; }
@@ -161,6 +170,7 @@ select.input-field option { background: #0f1117; }
         <button class="nav-btn" onclick="showPage('trades')">trades</button>
         <button class="nav-btn" onclick="showPage('calibration')">calibration</button>
         <button class="nav-btn" id="add-nav-btn" onclick="showPage('add')">+ add</button>
+        <button class="nav-btn" onclick="showPage('parlays')">parlays</button>
         <button class="nav-btn" onclick="showPage('calc')">⊕ calc</button>
         <button class="nav-btn" onclick="showPage('wiki')">wiki</button>
       </nav>
@@ -244,94 +254,185 @@ select.input-field option { background: #0f1117; }
       <div class="section-title" id="add-title">Log Trade</div>
     </div>
     <div class="card form-grid" style="max-width:600px;margin-bottom:20px">
-      <div>
-        <label class="form-label">MARKET</label>
-        <input class="input-field" id="f-market" placeholder="e.g. Chiefs to win Super Bowl" />
-      </div>
-      <div class="form-row2">
+      <label class="parlay-toggle" onclick="toggleParlayMode()">
+        <input type="checkbox" id="parlay-mode-check" onclick="event.stopPropagation();toggleParlayMode()" />
         <div>
-          <label class="form-label">CATEGORY</label>
-          <select class="input-field" id="f-category">
-            <option>Sports</option>
-            <option>Current Events</option>
-          </select>
+          <div style="color:#6366f1;font-weight:700;font-size:13px">Parlay / Combo</div>
+          <div style="color:#4a5568;font-size:11px;margin-top:2px">Log multiple legs with a single combined payout</div>
         </div>
-        <div>
-          <label class="form-label">DIRECTION</label>
-          <select class="input-field" id="f-direction">
-            <option>YES</option>
-            <option>NO</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-row3">
-        <div>
-          <label class="form-label">ENTRY PROB %</label>
-          <input class="input-field" id="f-prob" type="number" min="1" max="99" placeholder="75" />
-        </div>
-        <div>
-          <label class="form-label">STAKE ($)</label>
-          <input class="input-field" id="f-stake" type="number" min="1" placeholder="50" />
-        </div>
-        <div>
-          <label class="form-label">DATE</label>
-          <div class="cal-picker-wrap">
-            <button type="button" class="cal-trigger" id="cal-trigger" onclick="toggleCal()">
-              <span id="cal-display">Today</span>
-              <span class="cal-icon">📅</span>
-            </button>
-            <div class="cal-dropdown" id="cal-dropdown">
-              <div class="cal-header">
-                <button type="button" class="cal-nav" onclick="calNav(-1)">&#8249;</button>
-                <span class="cal-month-label" id="cal-month-label"></span>
-                <button type="button" class="cal-nav" onclick="calNav(1)">&#8250;</button>
-              </div>
-              <div class="cal-grid-days">
-                <div class="cal-day-label">Su</div><div class="cal-day-label">Mo</div><div class="cal-day-label">Tu</div>
-                <div class="cal-day-label">We</div><div class="cal-day-label">Th</div><div class="cal-day-label">Fr</div><div class="cal-day-label">Sa</div>
-              </div>
-              <div class="cal-grid-dates" id="cal-dates"></div>
+      </label>
+
+      <!-- Single trade fields -->
+      <div id="single-trade-fields">
+        <div class="form-grid">
+          <div>
+            <label class="form-label">MARKET</label>
+            <input class="input-field" id="f-market" placeholder="e.g. Chiefs to win Super Bowl" />
+          </div>
+          <div class="form-row2">
+            <div>
+              <label class="form-label">CATEGORY</label>
+              <select class="input-field" id="f-category">
+                <option>Sports</option>
+                <option>Current Events</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">DIRECTION</label>
+              <select class="input-field" id="f-direction">
+                <option>YES</option>
+                <option>NO</option>
+              </select>
             </div>
           </div>
-          <input type="hidden" id="f-date" />
-        </div>
-      </div>
-      <div>
-        <label class="form-label">STATUS</label>
-        <select class="input-field" id="f-status" onchange="toggleStatusFields()">
-          <option value="open">Open — still active</option>
-          <option value="yes">Resolved YES</option>
-          <option value="no">Resolved NO</option>
-          <option value="push">Push — void/tie</option>
-          <option value="exit">Closed Early</option>
-        </select>
-      </div>
-      <div id="exit-fields" style="display:none">
-        <div class="exit-banner">Early exit — counts toward P&amp;L but excluded from calibration.</div>
-        <div class="form-row2" style="margin-top:16px">
-          <div>
-            <label class="form-label">EXIT PRICE %</label>
-            <input class="input-field" id="f-exit-price" type="number" min="1" max="99" placeholder="85" />
+          <div class="form-row3">
+            <div>
+              <label class="form-label">ENTRY PROB %</label>
+              <input class="input-field" id="f-prob" type="number" min="1" max="99" placeholder="75" />
+            </div>
+            <div>
+              <label class="form-label">STAKE ($)</label>
+              <input class="input-field" id="f-stake" type="number" min="1" placeholder="50" />
+            </div>
+            <div>
+              <label class="form-label">DATE</label>
+              <div class="cal-picker-wrap">
+                <button type="button" class="cal-trigger" id="cal-trigger" onclick="toggleCal()">
+                  <span id="cal-display">Today</span>
+                  <span class="cal-icon">📅</span>
+                </button>
+                <div class="cal-dropdown" id="cal-dropdown">
+                  <div class="cal-header">
+                    <button type="button" class="cal-nav" onclick="calNav(-1)">&#8249;</button>
+                    <span class="cal-month-label" id="cal-month-label"></span>
+                    <button type="button" class="cal-nav" onclick="calNav(1)">&#8250;</button>
+                  </div>
+                  <div class="cal-grid-days">
+                    <div class="cal-day-label">Su</div><div class="cal-day-label">Mo</div><div class="cal-day-label">Tu</div>
+                    <div class="cal-day-label">We</div><div class="cal-day-label">Th</div><div class="cal-day-label">Fr</div><div class="cal-day-label">Sa</div>
+                  </div>
+                  <div class="cal-grid-dates" id="cal-dates"></div>
+                </div>
+              </div>
+              <input type="hidden" id="f-date" />
+            </div>
           </div>
           <div>
-            <label class="form-label">ACTUAL P&amp;L ($)</label>
-            <input class="input-field" id="f-exit-pnl" type="number" placeholder="12.50" step="0.01" />
-            <div style="color:#4a5568;font-size:11px;margin-top:4px">Negative for a loss</div>
+            <label class="form-label">STATUS</label>
+            <select class="input-field" id="f-status" onchange="toggleStatusFields()">
+              <option value="open">Open — still active</option>
+              <option value="yes">Resolved YES</option>
+              <option value="no">Resolved NO</option>
+              <option value="push">Push — void/tie</option>
+              <option value="exit">Closed Early</option>
+            </select>
+          </div>
+          <div id="exit-fields" style="display:none">
+            <div class="exit-banner">Early exit — counts toward P&amp;L but excluded from calibration.</div>
+            <div class="form-row2" style="margin-top:16px">
+              <div>
+                <label class="form-label">EXIT PRICE %</label>
+                <input class="input-field" id="f-exit-price" type="number" min="1" max="99" placeholder="85" />
+              </div>
+              <div>
+                <label class="form-label">ACTUAL P&amp;L ($)</label>
+                <input class="input-field" id="f-exit-pnl" type="number" placeholder="12.50" step="0.01" />
+                <div style="color:#4a5568;font-size:11px;margin-top:4px">Negative for a loss</div>
+              </div>
+            </div>
+          </div>
+          <div id="resolved-pnl-field" style="display:none">
+            <label class="form-label">ACTUAL P&amp;L ($) <span style="color:#4a5568;font-weight:normal;letter-spacing:0">— optional, from Robinhood</span></label>
+            <input class="input-field" id="f-actual-pnl" type="number" placeholder="e.g. 15.25 or -9.44" step="0.01" />
+            <div style="color:#4a5568;font-size:11px;margin-top:4px">If blank, P&amp;L estimated from implied odds</div>
+          </div>
+          <div>
+            <label class="form-label">NOTES (optional)</label>
+            <input class="input-field" id="f-notes" placeholder="Reasoning, source, context..." />
+          </div>
+          <div style="display:flex;gap:10px;margin-top:4px">
+            <button class="btn btn-primary" id="add-submit-btn" onclick="submitTrade()">Add Trade</button>
+            <button class="btn btn-ghost" id="cancel-edit-btn" style="display:none" onclick="cancelEdit()">Cancel</button>
           </div>
         </div>
       </div>
-      <div id="resolved-pnl-field" style="display:none">
-        <label class="form-label">ACTUAL P&amp;L ($) <span style="color:#4a5568;font-weight:normal;letter-spacing:0">— optional, from Robinhood</span></label>
-        <input class="input-field" id="f-actual-pnl" type="number" placeholder="e.g. 15.25 or -9.44" step="0.01" />
-        <div style="color:#4a5568;font-size:11px;margin-top:4px">If blank, P&amp;L estimated from implied odds</div>
-      </div>
-      <div>
-        <label class="form-label">NOTES (optional)</label>
-        <input class="input-field" id="f-notes" placeholder="Reasoning, source, context..." />
-      </div>
-      <div style="display:flex;gap:10px;margin-top:4px">
-        <button class="btn btn-primary" id="add-submit-btn" onclick="submitTrade()">Add Trade</button>
-        <button class="btn btn-ghost" id="cancel-edit-btn" style="display:none" onclick="cancelEdit()">Cancel</button>
+
+      <!-- Parlay fields -->
+      <div id="parlay-fields" style="display:none">
+        <div>
+          <label class="form-label">PARLAY NAME</label>
+          <input class="input-field" id="p-name" placeholder="e.g. Masters Parlay, March Madness 1" />
+        </div>
+        <div class="form-row2" style="margin-top:12px">
+          <div>
+            <label class="form-label">STAKE ($)</label>
+            <input class="input-field" id="p-stake" type="number" min="1" placeholder="50" oninput="updateParlayCalc()" />
+          </div>
+          <div>
+            <label class="form-label">DATE</label>
+            <div class="cal-picker-wrap">
+              <button type="button" class="cal-trigger" id="p-cal-trigger" onclick="togglePCal()">
+                <span id="p-cal-display">Today</span>
+                <span class="cal-icon">📅</span>
+              </button>
+              <div class="cal-dropdown" id="p-cal-dropdown">
+                <div class="cal-header">
+                  <button type="button" class="cal-nav" onclick="pCalNav(-1)">&#8249;</button>
+                  <span class="cal-month-label" id="p-cal-month-label"></span>
+                  <button type="button" class="cal-nav" onclick="pCalNav(1)">&#8250;</button>
+                </div>
+                <div class="cal-grid-days">
+                  <div class="cal-day-label">Su</div><div class="cal-day-label">Mo</div><div class="cal-day-label">Tu</div>
+                  <div class="cal-day-label">We</div><div class="cal-day-label">Th</div><div class="cal-day-label">Fr</div><div class="cal-day-label">Sa</div>
+                </div>
+                <div class="cal-grid-dates" id="p-cal-dates"></div>
+              </div>
+            </div>
+            <input type="hidden" id="p-date" />
+          </div>
+        </div>
+
+        <div style="margin-top:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <label class="form-label" style="margin:0">LEGS</label>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="addParlayLeg()">+ Add Leg</button>
+          </div>
+          <div id="parlay-legs-container"></div>
+        </div>
+
+        <div class="parlay-combined" id="parlay-calc-display" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="color:#4a5568;font-size:11px;letter-spacing:0.08em">COMBINED PROBABILITY</span>
+            <span id="parlay-combined-prob" style="color:#6366f1;font-weight:800;font-size:18px;font-family:Georgia,serif">—</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+            <span style="color:#4a5568;font-size:11px;letter-spacing:0.08em">IMPLIED PAYOUT</span>
+            <span id="parlay-implied-payout" style="color:#8b9ab0;font-size:13px">—</span>
+          </div>
+        </div>
+
+        <div style="margin-top:12px">
+          <label class="form-label">STATUS</label>
+          <select class="input-field" id="p-status">
+            <option value="open">Open — still active</option>
+            <option value="yes">Hit — all legs won</option>
+            <option value="no">Miss — at least one leg lost</option>
+            <option value="push">Push — void/tie</option>
+          </select>
+        </div>
+        <div id="p-payout-field" style="margin-top:12px">
+          <label class="form-label">ACTUAL PAYOUT ($) <span style="color:#4a5568;font-weight:normal;letter-spacing:0">— from Robinhood</span></label>
+          <input class="input-field" id="p-payout" type="number" placeholder="e.g. 142.50" step="0.01" />
+          <div style="color:#4a5568;font-size:11px;margin-top:4px">Total received including stake return. Leave blank if open.</div>
+        </div>
+        <div>
+          <label class="form-label" style="margin-top:12px">NOTES (optional)</label>
+          <input class="input-field" id="p-notes" placeholder="Context, reasoning..." />
+        </div>
+        <div style="display:flex;gap:10px;margin-top:16px">
+          <button class="btn btn-primary" onclick="submitParlay()">Add Parlay</button>
+          <button class="btn btn-ghost" onclick="cancelEdit()">Cancel</button>
+        </div>
       </div>
     </div>
     <div class="card" style="max-width:600px">
@@ -390,6 +491,19 @@ select.input-field option { background: #0f1117; }
         <span id="calc-total-pnl" style="font-family:Georgia,serif;font-weight:700;font-size:22px"></span>
       </div>
     </div>
+  </div>
+
+  <!-- PARLAYS -->
+  <div class="page" id="page-parlays">
+    <div class="flex-between">
+      <div>
+        <div class="section-title">Parlays</div>
+        <div class="section-sub" id="parlays-sub">Combined legs tracked separately from single trades</div>
+      </div>
+      <button class="btn btn-primary" onclick="showPage('add');enableParlayMode()">+ New Parlay</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px" id="parlay-stats"></div>
+    <div class="card" style="padding:0" id="parlays-list"></div>
   </div>
 
   <!-- WIKI -->
@@ -633,14 +747,17 @@ select.input-field option { background: #0f1117; }
 // ── Config ────────────────────────────────────────────────
 var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw6fWWLic8wCW8q03N6ozEm04NBlB-JczjVzQtZGEGrOOgpNiRcKliStPHW2VZOrS2S/exec';
 var HEADERS = ['id','market','category','platform','probability','direction','stake','status','exit_price','exit_pnl','actual_pnl','date','notes','brier'];
+var PARLAY_HEADERS = ['id','name','legs','stake','status','payout','date','notes'];
 
 // ── State ─────────────────────────────────────────────────
 var trades = [];
+var parlays = [];
 var editId = null;
 var currentFilter = 'All';
 var sortOrder = 'desc';
 var exitTargetId = null;
 var calCategory = 'All';
+var parlayLegs = [];
 
 // ── Toast ─────────────────────────────────────────────────
 function showToast(msg, color) {
@@ -666,20 +783,40 @@ function loadFromSheet() {
     .then(function(r){ return r.json(); })
     .then(function(data) {
       var rows = data.values || [];
-      if (rows.length <= 1) { trades = []; renderAll(); setSyncStatus('', 'Synced'); return; }
-      var headers = rows[0];
-      trades = rows.slice(1).filter(function(r){ return r[0]; }).map(function(r) {
-        var t = {};
-        headers.forEach(function(h, i){ t[h] = r[i] !== undefined ? r[i] : ''; });
-        t.probability = Number(t.probability) || 0;
-        t.stake = Number(t.stake) || 0;
-        t.id = Number(t.id) || Date.now();
-        t.exit_price = t.exit_price !== '' ? Number(t.exit_price) : null;
-        t.exit_pnl = t.exit_pnl !== '' ? Number(t.exit_pnl) : null;
-        t.actual_pnl = t.actual_pnl !== '' ? Number(t.actual_pnl) : null;
-        t.brier = t.brier !== '' && t.brier !== undefined ? Number(t.brier) : getBrier(t);
-        return t;
-      });
+      if (rows.length <= 1) { trades = []; renderAll(); setSyncStatus('', 'Synced'); }
+      else {
+        var headers = rows[0];
+        trades = rows.slice(1).filter(function(r){ return r[0]; }).map(function(r) {
+          var t = {};
+          headers.forEach(function(h, i){ t[h] = r[i] !== undefined ? r[i] : ''; });
+          t.probability = Number(t.probability) || 0;
+          t.stake = Number(t.stake) || 0;
+          t.id = Number(t.id) || Date.now();
+          t.exit_price = t.exit_price !== '' ? Number(t.exit_price) : null;
+          t.exit_pnl = t.exit_pnl !== '' ? Number(t.exit_pnl) : null;
+          t.actual_pnl = t.actual_pnl !== '' ? Number(t.actual_pnl) : null;
+          t.brier = t.brier !== '' && t.brier !== undefined ? Number(t.brier) : getBrier(t);
+          return t;
+        });
+      }
+      // Load parlays sheet
+      return fetch(SCRIPT_URL + '?sheet=parlays');
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      var rows = data.values || [];
+      if (rows.length > 1) {
+        var headers = rows[0];
+        parlays = rows.slice(1).filter(function(r){ return r[0]; }).map(function(r) {
+          var p = {};
+          headers.forEach(function(h, i){ p[h] = r[i] !== undefined ? r[i] : ''; });
+          p.id = Number(p.id) || Date.now();
+          p.stake = Number(p.stake) || 0;
+          p.payout = p.payout !== '' ? Number(p.payout) : null;
+          try { p.legs = JSON.parse(p.legs); } catch(e) { p.legs = []; }
+          return p;
+        });
+      }
       renderAll();
       setSyncStatus('', 'Synced · ' + trades.length + ' trades');
     })
@@ -705,6 +842,16 @@ function saveAllToSheet() {
   .catch(function(){ setSyncStatus('error', 'Save failed'); });
 }
 
+function saveParlaysToSheet() {
+  var values = [PARLAY_HEADERS].concat(parlays.map(function(p){
+    return [p.id, p.name||'', JSON.stringify(p.legs||[]), p.stake||0, p.status||'open', p.payout!=null?p.payout:'', p.date||'', p.notes||''];
+  }));
+  fetch(SCRIPT_URL, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'write', sheet: 'parlays', values: values })
+  }).catch(function(e){ console.error('Parlay save failed', e); });
+}
+
 // ── Nav ───────────────────────────────────────────────────
 function showPage(name) {
   document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
@@ -720,6 +867,7 @@ function showPage(name) {
   if (name==='dashboard') renderDashboard();
   if (name==='trades') renderTrades();
   if (name==='calibration') renderCalibration();
+  if (name==='parlays') renderParlays();
   if (name==='calc') { initCalc(); }
   if (name!=='add') cancelEdit();
   if (name==='wiki') {
@@ -735,6 +883,7 @@ function renderAll() {
   if (name==='dashboard') renderDashboard();
   if (name==='trades') renderTrades();
   if (name==='calibration') renderCalibration();
+  if (name==='parlays') renderParlays();
   else renderDashboard();
 }
 
@@ -1103,6 +1252,17 @@ function editTrade(id) {
 
 function cancelEdit() {
   editId=null;
+  parlayLegs=[];
+  document.getElementById('parlay-mode-check').checked = false;
+  document.getElementById('single-trade-fields').style.display = 'block';
+  document.getElementById('parlay-fields').style.display = 'none';
+  document.getElementById('p-name').value='';
+  document.getElementById('p-stake').value='';
+  document.getElementById('p-status').value='open';
+  document.getElementById('p-payout').value='';
+  document.getElementById('p-notes').value='';
+  document.getElementById('parlay-legs-container').innerHTML='';
+  document.getElementById('parlay-calc-display').style.display='none';
   document.getElementById('f-market').value='';
   document.getElementById('f-category').value='Sports';
   document.getElementById('f-direction').value='YES';
@@ -1441,6 +1601,302 @@ function calcUpdate() {
   totalEl.textContent = (totalPnl >= 0 ? '+' : '') + '$' + totalPnl.toFixed(2);
   totalEl.style.color = totalPnl >= 0 ? '#10b981' : '#ef4444';
   resultsEl.style.display = 'block';
+}
+
+// ── Parlay UI ─────────────────────────────────────────────
+function toggleParlayMode() {
+  var check = document.getElementById('parlay-mode-check');
+  check.checked = !check.checked;
+  document.getElementById('single-trade-fields').style.display = check.checked ? 'none' : 'block';
+  document.getElementById('parlay-fields').style.display = check.checked ? 'block' : 'none';
+  if (check.checked && parlayLegs.length === 0) {
+    parlayLegs = [{market:'',category:'Sports',direction:'YES',probability:''}];
+    renderParlayLegs();
+    pCalInit(new Date().toISOString().slice(0,10));
+  }
+}
+
+function enableParlayMode() {
+  var check = document.getElementById('parlay-mode-check');
+  check.checked = true;
+  document.getElementById('single-trade-fields').style.display = 'none';
+  document.getElementById('parlay-fields').style.display = 'block';
+  parlayLegs = [{market:'',category:'Sports',direction:'YES',probability:''},{market:'',category:'Sports',direction:'YES',probability:''}];
+  renderParlayLegs();
+  pCalInit(new Date().toISOString().slice(0,10));
+}
+
+function addParlayLeg() {
+  parlayLegs.push({market:'',category:'Sports',direction:'YES',probability:''});
+  renderParlayLegs();
+}
+
+function removeParlayLeg(i) {
+  if (parlayLegs.length <= 2) return;
+  parlayLegs.splice(i, 1);
+  renderParlayLegs();
+  updateParlayCalc();
+}
+
+function renderParlayLegs() {
+  var html = '';
+  parlayLegs.forEach(function(leg, i) {
+    html += '<div class="parlay-leg">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+        + '<div class="parlay-leg-num">LEG ' + (i+1) + '</div>'
+        + (parlayLegs.length > 2 ? '<button type="button" class="btn-danger" onclick="removeParlayLeg('+i+')">✕</button>' : '')
+      + '</div>'
+      + '<div style="margin-bottom:8px">'
+        + '<label class="form-label">MARKET</label>'
+        + '<input class="input-field" placeholder="e.g. Chiefs ML" value="'+(leg.market||'')+'" oninput="parlayLegs['+i+'].market=this.value" />'
+      + '</div>'
+      + '<div class="form-row3">'
+        + '<div><label class="form-label">CATEGORY</label>'
+          + '<select class="input-field" onchange="parlayLegs['+i+'].category=this.value">'
+            + '<option'+(leg.category==='Sports'?' selected':'')+'>Sports</option>'
+            + '<option'+(leg.category==='Current Events'?' selected':'')+'>Current Events</option>'
+          + '</select></div>'
+        + '<div><label class="form-label">DIRECTION</label>'
+          + '<select class="input-field" onchange="parlayLegs['+i+'].direction=this.value">'
+            + '<option'+(leg.direction==='YES'?' selected':'')+'>YES</option>'
+            + '<option'+(leg.direction==='NO'?' selected':'')+'>NO</option>'
+          + '</select></div>'
+        + '<div><label class="form-label">PROB %</label>'
+          + '<input class="input-field" type="number" min="1" max="99" placeholder="65" value="'+(leg.probability||'')+'" oninput="parlayLegs['+i+'].probability=this.value;updateParlayCalc()" /></div>'
+      + '</div>'
+    + '</div>';
+  });
+  document.getElementById('parlay-legs-container').innerHTML = html;
+  updateParlayCalc();
+}
+
+function updateParlayCalc() {
+  var probs = parlayLegs.map(function(l){ return Number(l.probability); }).filter(function(p){ return p > 0 && p < 100; });
+  var display = document.getElementById('parlay-calc-display');
+  if (probs.length < 2) { display.style.display = 'none'; return; }
+  var combined = probs.reduce(function(a, p){ return a * (p/100); }, 1);
+  var stake = Number(document.getElementById('p-stake').value) || 0;
+  var impliedPayout = stake > 0 ? (stake / combined).toFixed(2) : '—';
+  document.getElementById('parlay-combined-prob').textContent = (combined * 100).toFixed(1) + '%';
+  document.getElementById('parlay-implied-payout').textContent = stake > 0 ? '$' + impliedPayout : '—';
+  display.style.display = 'block';
+}
+
+function submitParlay() {
+  var name = document.getElementById('p-name').value.trim();
+  var stake = Number(document.getElementById('p-stake').value);
+  var status = document.getElementById('p-status').value;
+  var payout = document.getElementById('p-payout').value;
+  var date = document.getElementById('p-date').value;
+  if (!name) { showToast('Enter a parlay name'); return; }
+  if (!stake) { showToast('Enter a stake'); return; }
+  if (parlayLegs.length < 2) { showToast('Add at least 2 legs'); return; }
+  var validLegs = parlayLegs.filter(function(l){ return l.market && l.probability; });
+  if (validLegs.length < 2) { showToast('Fill in market and probability for each leg'); return; }
+
+  var parlayId = 'P-' + Date.now();
+  var p = {
+    id: Date.now(),
+    name: name,
+    legs: validLegs,
+    stake: stake,
+    status: status,
+    payout: payout !== '' ? Number(payout) : null,
+    date: date,
+    notes: document.getElementById('p-notes').value.trim()
+  };
+  parlays.push(p);
+
+  // Also add each leg as an individual trade linked by parlay_id
+  var pnlPerLeg = 0; // legs show $0 P&L individually — parlay handles it
+  validLegs.forEach(function(leg, i) {
+    var t = {
+      id: Date.now() + i + 1,
+      market: leg.market,
+      category: leg.category,
+      platform: 'Kalshi',
+      direction: leg.direction,
+      probability: Number(leg.probability),
+      stake: 0, // no individual stake — parlay-level only
+      status: status === 'yes' ? 'yes' : status === 'no' ? 'no' : status === 'push' ? 'push' : 'open',
+      exit_price: null,
+      exit_pnl: null,
+      actual_pnl: 0, // P&L tracked at parlay level
+      date: date,
+      notes: 'Parlay leg · ' + name,
+      parlay_id: parlayId
+    };
+    t.brier = getBrier(t);
+    trades.push(t);
+  });
+
+  saveParlaysToSheet();
+  saveAllToSheet();
+  showToast('Parlay added · ' + validLegs.length + ' legs logged to trades');
+  parlayLegs = [];
+  cancelEdit();
+  showPage('parlays');
+}
+
+function deleteParlay(id) {
+  if (!confirm('Delete this parlay and its legs from trades?')) return;
+  var parlay = parlays.find(function(p){ return p.id == id; });
+  parlays = parlays.filter(function(p){ return p.id != id; });
+  // Remove associated trade legs
+  if (parlay) {
+    trades = trades.filter(function(t){ return !(t.notes && t.notes.indexOf('Parlay leg · ' + parlay.name) === 0); });
+  }
+  saveParlaysToSheet();
+  saveAllToSheet();
+  showToast('Parlay deleted');
+  renderParlays();
+}
+
+function resolveParlayTrade(parlayId, status) {
+  var parlay = parlays.find(function(p){ return p.id == parlayId; });
+  if (!parlay) return;
+  var payoutRaw = prompt('Enter actual payout from Robinhood (total received, including stake return):\nLeave blank if no payout (loss/push).');
+  var payout = payoutRaw !== null && payoutRaw !== '' ? Number(payoutRaw) : null;
+  parlay.status = status;
+  parlay.payout = payout;
+  // Update leg statuses in trades
+  trades = trades.map(function(t){
+    if (t.notes && t.notes.indexOf('Parlay leg · ' + parlay.name) === 0) {
+      var updated = Object.assign({}, t, {
+        status: status,
+        actual_pnl: 0
+      });
+      updated.brier = getBrier(updated);
+      return updated;
+    }
+    return t;
+  });
+  saveParlaysToSheet();
+  saveAllToSheet();
+  showToast('Parlay resolved ' + (status === 'yes' ? 'HIT' : status === 'push' ? 'PUSH' : 'MISS'));
+  renderParlays();
+}
+
+function renderParlays() {
+  var resolved = parlays.filter(function(p){ return p.status==='yes'||p.status==='no'; });
+  var hits = parlays.filter(function(p){ return p.status==='yes'; });
+  var totalStaked = parlays.reduce(function(a,p){ return a+p.stake; }, 0);
+  var totalPayout = parlays.reduce(function(a,p){ return a+(p.payout||0); }, 0);
+  var pnl = totalPayout - totalStaked;
+
+  var statsHtml = ''
+    + '<div class="stat-card"><div class="stat-label">HIT RATE</div>'
+      + '<div class="stat-value" style="color:#6366f1">' + (resolved.length ? Math.round(hits.length/resolved.length*100)+'%' : '—') + '</div>'
+      + '<div class="stat-sub">' + hits.length + ' of ' + resolved.length + ' resolved</div></div>'
+    + '<div class="stat-card"><div class="stat-label">PARLAY P&amp;L</div>'
+      + '<div class="stat-value" style="color:'+(pnl>=0?'#10b981':'#ef4444')+'">'+(parlays.length?(pnl>=0?'+':'')+' $'+pnl.toFixed(2):'—')+'</div>'
+      + '<div class="stat-sub">across ' + parlays.length + ' parlays</div></div>'
+    + '<div class="stat-card"><div class="stat-label">TOTAL PARLAYS</div>'
+      + '<div class="stat-value" style="color:#6366f1">' + parlays.length + '</div>'
+      + '<div class="stat-sub">' + parlays.filter(function(p){return p.status==='open';}).length + ' still open</div></div>';
+  document.getElementById('parlay-stats').innerHTML = statsHtml;
+
+  var list = document.getElementById('parlays-list');
+  if (!parlays.length) {
+    list.innerHTML = '<div class="empty-state"><div style="font-size:40px;margin-bottom:12px">🎯</div><div style="font-family:Georgia,serif;font-weight:700;font-size:18px;color:#8b9ab0;margin-bottom:8px">No parlays yet</div><div>Use the + New Parlay button to log a combo</div></div>';
+    return;
+  }
+
+  var sorted = parlays.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  var html = sorted.map(function(p){
+    var isHit = p.status === 'yes';
+    var isMiss = p.status === 'no';
+    var isOpen = p.status === 'open';
+    var isPush = p.status === 'push';
+    var combinedProb = p.legs.reduce(function(a,l){ return a*(Number(l.probability)/100); }, 1);
+    var pnl = p.payout != null ? p.payout - p.stake : null;
+    var dotColor = isOpen ? '#f59e0b' : isHit ? '#10b981' : isPush ? '#6366f1' : '#ef4444';
+
+    var statusBadge = isOpen
+      ? '<button class="btn-yes" onclick="resolveParlayTrade('+p.id+',\'yes\')">HIT</button>'
+        + '<button class="btn-no" onclick="resolveParlayTrade('+p.id+',\'no\')">MISS</button>'
+        + '<button class="btn-push" onclick="resolveParlayTrade('+p.id+',\'push\')">PUSH</button>'
+      : '<span class="pill" style="background:'+(isHit?'#10b98120':isPush?'#6366f120':'#ef444420')+';color:'+(isHit?'#10b981':isPush?'#6366f1':'#ef4444')+'">'+(isHit?'HIT':isPush?'PUSH':'MISS')+'</span>'
+        + (pnl!=null?'<span class="pill" style="background:'+(pnl>=0?'#10b98120':'#ef444420')+';color:'+(pnl>=0?'#10b981':'#ef4444')+'">'+(pnl>=0?'+':'')+' $'+pnl.toFixed(2)+'</span>':'');
+
+    var legsHtml = p.legs.map(function(l){
+      return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #1e223040">'
+        + '<div style="width:4px;height:4px;border-radius:50%;background:#6366f1;flex-shrink:0"></div>'
+        + '<div style="flex:1;font-size:11px;color:#8b9ab0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+l.market+'</div>'
+        + '<div style="font-size:11px;color:#6366f1;flex-shrink:0">'+l.probability+'% · '+l.direction+'</div>'
+      + '</div>';
+    }).join('');
+
+    return '<div class="parlay-row" style="flex-direction:column;align-items:stretch;gap:10px">'
+      + '<div style="display:flex;align-items:center;gap:12px">'
+        + '<div style="width:6px;height:6px;border-radius:50%;background:'+dotColor+';flex-shrink:0'+(isOpen?';box-shadow:0 0 6px #f59e0b80':'')+'"</div>'
+        + '<div style="flex:1;min-width:0">'
+          + '<div style="font-size:14px;color:#e2e8f0;font-weight:700">'+p.name+'</div>'
+          + '<div style="font-size:11px;color:#4a5568;margin-top:2px">'+p.date+' · '+p.legs.length+' legs · $'+p.stake+' stake · '+(combinedProb*100).toFixed(1)+'% combined</div>'
+        + '</div>'
+        + '<div style="display:flex;gap:6px;align-items:center;flex-shrink:0">'
+          + statusBadge
+          + '<button class="btn-danger" onclick="deleteParlay('+p.id+')">✕</button>'
+        + '</div>'
+      + '</div>'
+      + '<div style="padding:8px 12px;background:#080b1280;border-radius:6px;margin-left:18px">' + legsHtml + '</div>'
+      + (p.notes ? '<div style="font-size:11px;color:#4a5568;margin-left:18px">'+p.notes+'</div>' : '')
+    + '</div>';
+  }).join('');
+  list.innerHTML = html;
+}
+
+// ── Parlay Calendar ───────────────────────────────────────
+var pCalYear, pCalMonth, pCalSelectedDate;
+function pCalInit(dateStr) {
+  var d = dateStr ? new Date(dateStr+'T12:00:00') : new Date();
+  pCalSelectedDate = dateStr || toDateStr(new Date());
+  pCalYear = d.getFullYear(); pCalMonth = d.getMonth();
+  pCalRender(); updatePCalDisplay();
+}
+function updatePCalDisplay() {
+  document.getElementById('p-date').value = pCalSelectedDate || '';
+  var d = pCalSelectedDate ? new Date(pCalSelectedDate+'T12:00:00') : new Date();
+  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('p-cal-display').textContent = months[d.getMonth()]+' '+d.getDate()+', '+d.getFullYear();
+}
+function pCalRender() {
+  var months=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('p-cal-month-label').textContent = months[pCalMonth]+' '+pCalYear;
+  var grid = document.getElementById('p-cal-dates');
+  var today = toDateStr(new Date());
+  var firstDay = new Date(pCalYear,pCalMonth,1).getDay();
+  var daysInMonth = new Date(pCalYear,pCalMonth+1,0).getDate();
+  var daysInPrev = new Date(pCalYear,pCalMonth,0).getDate();
+  var html = '';
+  for (var i=firstDay-1;i>=0;i--) html+='<button type="button" class="cal-date other-month" onclick="pCalSelect(\''+toDateStr(new Date(pCalYear,pCalMonth-1,daysInPrev-i))+'\')">'+( daysInPrev-i)+'</button>';
+  for (var d=1;d<=daysInMonth;d++){
+    var ds=toDateStr(new Date(pCalYear,pCalMonth,d));
+    var cls='cal-date'+(ds===today?' today':'')+(ds===pCalSelectedDate?' selected':'');
+    html+='<button type="button" class="'+cls+'" onclick="pCalSelect(\''+ds+'\')">'+d+'</button>';
+  }
+  var total=firstDay+daysInMonth,remaining=total%7===0?0:7-(total%7);
+  for (var n=1;n<=remaining;n++) html+='<button type="button" class="cal-date other-month" onclick="pCalSelect(\''+toDateStr(new Date(pCalYear,pCalMonth+1,n))+'\')">'+n+'</button>';
+  grid.innerHTML = html;
+}
+function pCalSelect(dateStr) {
+  pCalSelectedDate = dateStr;
+  var d = new Date(dateStr+'T12:00:00');
+  pCalYear = d.getFullYear(); pCalMonth = d.getMonth();
+  pCalRender(); updatePCalDisplay();
+  document.getElementById('p-cal-dropdown').classList.remove('open');
+  document.getElementById('p-cal-trigger').classList.remove('open');
+}
+function pCalNav(dir) {
+  pCalMonth += dir;
+  if (pCalMonth>11){pCalMonth=0;pCalYear++;} if (pCalMonth<0){pCalMonth=11;pCalYear--;}
+  pCalRender();
+}
+function togglePCal() {
+  var dd=document.getElementById('p-cal-dropdown'),tr=document.getElementById('p-cal-trigger');
+  var isOpen=dd.classList.contains('open');
+  if (isOpen){dd.classList.remove('open');tr.classList.remove('open');}
+  else{dd.classList.add('open');tr.classList.add('open');pCalRender();}
 }
 
 // ── Wiki ──────────────────────────────────────────────────
