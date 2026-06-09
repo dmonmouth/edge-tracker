@@ -1866,20 +1866,24 @@ function renderParlays() {
       + '</div>';
     }).join('') : '<div style="font-size:11px;color:#4a5568;padding:4px 0">No leg data</div>';
 
-    return '<div class="parlay-row" style="flex-direction:column;align-items:stretch;gap:10px">'
-      + '<div style="display:flex;align-items:center;gap:12px">'
-        + '<div style="width:6px;height:6px;border-radius:50%;background:'+dotColor+';flex-shrink:0'+(isOpen?';box-shadow:0 0 6px #f59e0b80':'')+'"</div>'
+    return '<div style="padding:14px 20px;border-bottom:1px solid #1e2230">'
+      + '<div style="display:flex;align-items:flex-start;gap:12px">'
+        + '<div style="width:6px;height:6px;border-radius:50%;background:'+dotColor+';flex-shrink:0;margin-top:6px'+(isOpen?';box-shadow:0 0 6px #f59e0b80':'')+'"</div>'
         + '<div style="flex:1;min-width:0">'
-          + '<div style="font-size:14px;color:#e2e8f0;font-weight:700">'+displayName+'</div>'
-          + '<div style="font-size:11px;color:#4a5568;margin-top:2px">'+displayDate+' · '+legs.length+' legs · $'+stake.toFixed(2)+' stake · '+(combinedProb*100).toFixed(1)+'% combined</div>'
-        + '</div>'
-        + '<div style="display:flex;gap:6px;align-items:center;flex-shrink:0">'
-          + statusBadge
-          + '<button class="btn-danger" onclick="deleteParlay('+p.id+')">✕</button>'
+          + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">'
+            + '<div style="min-width:0">'
+              + '<div style="font-size:14px;color:#e2e8f0;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:400px">'+displayName+'</div>'
+              + '<div style="font-size:11px;color:#4a5568;margin-top:2px">'+displayDate+' · '+legs.length+' legs · $'+stake.toFixed(2)+' stake · '+(combinedProb*100).toFixed(1)+'% combined</div>'
+            + '</div>'
+            + '<div style="display:flex;gap:6px;align-items:center;flex-shrink:0">'
+              + statusBadge
+              + '<button class="btn-danger" onclick="deleteParlay('+p.id+')">✕</button>'
+            + '</div>'
+          + '</div>'
+          + '<div style="padding:8px 12px;background:#080b1280;border-radius:6px;margin-top:10px">' + legsHtml + '</div>'
+          + (p.notes && p.notes !== 'undefined' ? '<div style="font-size:11px;color:#4a5568;margin-top:6px">'+p.notes+'</div>' : '')
         + '</div>'
       + '</div>'
-      + '<div style="padding:8px 12px;background:#080b1280;border-radius:6px;margin-left:18px">' + legsHtml + '</div>'
-      + (p.notes && p.notes !== 'undefined' ? '<div style="font-size:11px;color:#4a5568;margin-left:18px">'+p.notes+'</div>' : '')
     + '</div>';
   }).join('');
   list.innerHTML = html;
